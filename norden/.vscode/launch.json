@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "NORDEN: iniciar e depurar",
+      "type": "node",
+      "request": "launch",
+      "program": "${workspaceFolder}/src/server.mjs",
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "skipFiles": ["<node_internals>/**"],
+      "preLaunchTask": "NORDEN: preparar dados de demonstracao"
+    }
+  ]
+}
