@@ -72,8 +72,10 @@ export function openPostgres(connectionString,secret) {
   const url=new URL(connectionString);
   const local=['localhost','127.0.0.1','[::1]'].includes(url.hostname);
   url.searchParams.delete('sslmode');
+  const certificate=process.env.NORDEN_PG_CA;
+  const ssl=local?false:{rejectUnauthorized:true,...(certificate?{ca:Buffer.from(certificate,'base64').toString('utf8')}:{})};
   const pool=new pg.Pool({connectionString:url.href,max:4,connectionTimeoutMillis:5000,idleTimeoutMillis:15000,
-    application_name:'norden', ssl:local?false:{rejectUnauthorized:true},
+    application_name:'norden',ssl,
     types:{getTypeParser:(oid,format)=>oid===20&&format!=='binary'?Number:pg.types.getTypeParser(oid,format)}});
   pool.on('error',error=>console.error('Conexão PostgreSQL encerrada',error.code??error.name));
   return postgresDatabase(pool,secret);
