@@ -1,19 +1,42 @@
 <!doctype html>
-<html lang="pt-BR">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0B0B0D">
-<meta name="description" content="Salão inteligente masculino. Agende cortes e barba, acompanhe seus cuidados e conheça a NORDEN Store.">
-<title>NORDEN — Salão Inteligente Masculino</title>
-<link rel="stylesheet" href="./style.css">
-<link rel="stylesheet" href="./norden.css">
-<script type="module" src="./app.mjs"></script>
-</head>
-<body class="pages-preview">
-<a class="skip" href="#conteudo">Ir para o conteúdo</a>
-<div id="app" aria-busy="true"><div class="norden-loading" role="status"><svg class="scissor-loader" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><g class="scissor-half first"><circle cx="28" cy="76" r="10"/><path d="M34 68 72 16 52 52"/></g><g class="scissor-half second"><circle cx="72" cy="76" r="10"/><path d="M66 68 28 16 48 52"/></g><circle cx="50" cy="50" r="3" fill="currentColor"/></svg><span class="wordmark">NORDEN</span><p>Preparando sua experiência…</p><span class="loading-track" aria-hidden="true"></span></div></div>
-<div id="toast" role="status" aria-live="polite" aria-atomic="true"></div>
-<noscript>Ative o JavaScript para acessar as telas e os serviços do NORDEN.</noscript>
-</body>
+<html lang="pt-BR" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NORDEN — Salão Masculino Premium</title>
+    <meta
+      name="description"
+      content="Plataforma inteligente de cuidados masculinos: agendamento online, NORDEN Journey, Care, Flow, loja integrada, estoque e relatórios financeiros."
+    />
+    <meta property="og:title" content="NORDEN — Salão Masculino Premium" />
+    <meta
+      property="og:description"
+      content="Seu estilo. Sua evolução. Experiência masculina contemporânea com agendamento inteligente, histórico digital de cuidados e loja integrada."
+    />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400..700;1,9..40,400..700&family=JetBrains+Mono:wght@400;500;600&family=Outfit:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('norden_theme');
+          if (saved === 'light') {
+            document.documentElement.classList.remove('dark');
+          } else {
+            document.documentElement.classList.add('dark');
+          }
+        } catch (e) {}
+      })();
+    </script>
+    <script type="module" crossorigin src="./assets/index-CY1CdlPN.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-DWMra3t8.css">
+  </head>
+  <body class="bg-[var(--bg-canvas)] text-[var(--text-primary)] antialiased selection:bg-[#8E6B47]/30 selection:text-[var(--text-primary)]">
+    <div id="root"></div>
+  </body>
 </html>

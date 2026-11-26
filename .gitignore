@@ -7,3 +7,5 @@
 **/node_modules/
 *.sqlite*
 *.key
+!preview/src/data/
+!preview/src/data/seedData.ts

@@ -8,7 +8,7 @@ import {seed,demoAccounts} from './seed.mjs';
 
 // Only synthetic, in-memory data is exported. Never open the local data/ database.
 const root=fileURLToPath(new URL('../',import.meta.url));
-const output=process.argv[2]?resolve(process.argv[2]):fileURLToPath(new URL('../../docs/',import.meta.url));
+const output=process.argv[2]?resolve(process.argv[2]):fileURLToPath(new URL('../dist/pages-legacy/',import.meta.url));
 const db=openDatabase(':memory:');
 const secret=randomBytes(24).toString('hex');
 await seed(db,secret);
@@ -69,4 +69,4 @@ let html=readFileSync(join(output,'index.html'),'utf8').replaceAll('href="/','hr
 html=html.replace('<body>','<body class="pages-preview">');
 writeFileSync(join(output,'index.html'),html);
 writeFileSync(join(output,'.nojekyll'),'');
-console.log('Prévia GitHub Pages gerada em docs/ com dados exclusivamente fictícios.');
+console.log(`Prévia legada gerada em ${output} com dados exclusivamente fictícios.`);

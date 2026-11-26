@@ -4,9 +4,18 @@ Plataforma local com agendamento, área profissional, histórico Journey, manuai
 
 ## GitHub Pages
 
-[Abrir a demonstração online](https://da0602766-byte.github.io/NORDEN/). A pasta `docs/` contém uma prévia estática com dados fictícios e seleção de perfil no topo. Agendamentos, pedidos, cadastros e outras gravações precisam do servidor e ficam indisponíveis nessa prévia. Nenhum dado do banco local é exportado.
+[Abrir a demonstração online](https://da0602766-byte.github.io/NORDEN/). A interface React em `preview/` inclui landing page, loja, agenda, Journey, Care, Flow e painéis com perfis fictícios. Reservas e pedidos são simulações guardadas apenas no navegador. O servidor em `norden/` usa seu próprio banco SQLite e mantém os fluxos que exigem autenticação.
 
-Em **Settings → Pages**, mantenha **Deploy from a branch → main → /docs**. Para atualizar a prévia após alterar a interface, execute `cd norden` e `npm run build:pages`, depois envie `docs/` junto com o código. As rotas da prévia usam `#/` para funcionar em subpastas e após atualizar a página.
+Em **Settings → Pages**, mantenha **Deploy from a branch → main → /docs**. Para atualizar a demonstração pública:
+
+```sh
+cd preview
+npm ci
+npm run typecheck
+npm run build:pages
+```
+
+Envie as mudanças em `preview/` e o conteúdo gerado em `docs/` no mesmo commit. Para desenvolvimento, use `npm run dev` em `preview/`. A exportação legada em `norden/` grava por padrão em `norden/dist/pages-legacy/`.
 
 ## Executar
 
