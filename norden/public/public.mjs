@@ -1,13 +1,16 @@
 import {state,esc,brand,icon,img,link,button,eyebrow,form,field,hidden,pageHead,sectionHead,empty,row,notice,
   publicItems,find,money,cartCount,lines,select,q,banner} from './ui.mjs';
 export const accountHome=()=>state.data.user?.role==='cliente'?'/app':state.data.user?'/gestao':'/login';
+const demoRoot='https://da0602766-byte.github.io/NORDEN/';
+const demoHref=staff=>demoRoot+(staff?'?perfil=gestor#/gestao':'?perfil=cliente#/app');
 export function header() {
   return `<header class="site-header"><div class="wrap nav-bar">
     ${brand()}<button type="button" class="icon-button mobile-menu" data-command="menu" aria-label="Abrir navegação" aria-expanded="false">${icon('menu')}</button>
     <nav class="public-nav" aria-label="Navegação principal">
       ${link('/servicos','Serviços','nav-link')}${link('/#experiencia','Experiência','nav-link')}${link('/profissionais','Profissionais','nav-link')}${link('/loja','Loja','nav-link')}
+      ${state.data.production?link('/usuario','Área do cliente','nav-link')+link('/gerencia','Gerência','nav-link')+(!state.data.user?link('/usuario/cadastro','Criar conta','nav-link signup-nav'):''):''}
     </nav><div class="nav-actions">
-      ${link(accountHome(),state.data.user?'Minha área':'Entrar','nav-link account-link','user')}
+      ${link(state.data.production&&!state.data.user?'/usuario/entrar':accountHome(),state.data.user?'Minha área':'Entrar','nav-link account-link','user')}
       <a href="/app/carrinho" class="icon-button cart-icon" aria-label="Carrinho, ${cartCount()} ${cartCount()===1?'item':'itens'}">${icon('bag')}${cartCount()?'<b>'+cartCount()+'</b>':''}</a>
       ${link('/app/agendar','Agendar horário','button primary nav-cta','calendar')}
     </div></div></header>`;
@@ -18,16 +21,23 @@ export function footer() {
     <div>${brand()}<p>Salão inteligente masculino.</p></div>
     <nav aria-label="Informações do NORDEN">${link('/servicos','Serviços','nav-link')}${link('/loja','Loja','nav-link')}${link('/galeria','Galeria','nav-link')}${link('/contato','Contato','nav-link')}</nav>
     <nav aria-label="Políticas">${link('/privacidade','Privacidade','nav-link')}${link('/termos','Termos','nav-link')}</nav>
-    <div class="footer-meta"><span>NORDEN</span><span>Ambiente de demonstração · catálogo e imagens ilustrativos</span>${info.address?`<span>${esc(info.address)}</span>`:''}</div>
+    <div class="footer-meta"><span>Criado por Douglas Anderson, Davi Alexandre, Waldemar Roberto e Cristian Pereira</span>${state.data.production?link(demoRoot,'Explorar demonstração','nav-link'):'<span>Ambiente de demonstração</span>'}${info.address?`<span>${esc(info.address)}</span>`:''}</div>
   </div></footer>`;
 }
 const publicList=key=>publicItems(key);
 const serviceItem=(item,compact=false)=>`<article class="service-item">
   <div class="service-mark">${icon(item.category==='Barba'?'scissors':item.category==='Combos'?'grid':'scissors',25)}</div>
-  <div class="service-copy"><a href="/servicos/${esc(item.id)}"><h3>${esc(item.name)}</h3></a><p>${esc(item.description)}</p></div>
+  <div class="service-copy"><a href="/servicos/${esc(item.id)}"><h3>${esc(item.name)}</h3></a><p>${esc(item.description)}</p>
+  ${compact?compatibleProductLinks(item.id):''}</div>
   <div class="service-spec"><span>${icon('clock',17)} ${item.duration} min</span><strong>${money(item.price)}</strong></div>
   ${compact?link('/app/agendar?servico='+item.id,'Agendar','text-button'):link('/servicos/'+item.id,'Ver detalhes','text-button')}
 </article>`;
+function compatibleProductLinks(serviceId) {
+  const products=state.data.catalog.serviceProducts.filter(entry=>entry.service_id===serviceId)
+    .map(entry=>find('products',entry.product_id)).filter(product=>product?.active).slice(0,2);
+  return products.length?`<div class="service-product-links" aria-label="Produtos compatíveis">${products.map(product=>
+    link('/loja/'+product.id,product.name,'service-product-link')).join('')}</div>`:'';
+}
 const productCard=item=>`<article class="product-card"><a class="product-image" href="/loja/${esc(item.id)}" aria-label="Conhecer ${esc(item.name)}">
   ${img(item.image||'/assets/kit.webp',item.name,'','loading="lazy" width="600" height="600"')}<span class="product-image-hint">Conhecer produto</span>${!item.available?'<span class="status image-badge">Esgotado</span>':item.promo!==null?'<span class="status image-badge">Oferta</span>':''}</a>
   <div class="product-card-body"><span class="eyebrow">${esc(item.category)}</span><a href="/loja/${esc(item.id)}" class="product-name">${esc(item.name)}</a><p class="product-description">${esc(item.description)}</p>
@@ -128,34 +138,36 @@ function shop(ref) {
     ${max>1?`<nav class="actions pagination" aria-label="Paginação">${current>1?link(pageHref(current-1),'Anterior','button outline'):''}<span>Página ${current} de ${max}</span>${current<max?link(pageHref(current+1),'Próxima','button outline'):''}</nav>`:''}`;
 }
 const pairQuantity=available=>field('Quantidade','quantity',1,'number','min="1" max="'+Math.min(available,99)+'" required');
-export function authView(path) {
-  const token=q('token'),target=q('voltar');
-  const isRegister=path==='/cadastro',invite=path==='/conta/convite';
+export function authView(path,targetOverride='') {
+  const token=q('token'),target=q('voltar')||targetOverride;
+  const production=state.data.production,staff=path==='/gestao/entrar';
+  const isRegister=['/cadastro','/app/cadastro'].includes(path),invite=path==='/conta/convite';
   const reset=path==='/conta/redefinir',recover=path==='/recuperar-senha',verify=path==='/conta/verificar';
-  let title='Bem-vindo ao NORDEN.',sub='Acesse seus agendamentos, cuidados e pedidos.',code='login',fields='';
+  let title=staff?'Acesso à gerência':production?'Acesse sua conta':'Bem-vindo ao NORDEN.',sub=staff?'Entre com a conta autorizada pela equipe.':'Acesse seus agendamentos, cuidados e pedidos.',code='login',fields='';
   const mail=field('E-mail','email','','email','autocomplete="email" required maxlength="240"');
   const secret=field(reset?'Nova senha':'Senha','password','','password',`autocomplete="${isRegister||invite||reset?'new-password':'current-password'}" ${isRegister||invite||reset?'minlength="10"':''} required maxlength="128"`);
   const confirm=field('Confirme a senha','confirm','','password','autocomplete="new-password" minlength="10" required maxlength="128"');
   if(isRegister||invite) {
     title=invite?'Ativar seu convite':'Crie sua conta.';
-    sub=invite?'Use o e-mail indicado no convite administrativo.':'Use dados fictícios para experimentar a plataforma.';
+    sub=invite?'Use o e-mail indicado no convite administrativo.':production?'Cadastre-se para agendar e acompanhar seus pedidos.':'Use dados fictícios para experimentar a plataforma.';
     code=invite?'redeem':'register';
     fields=field('Nome completo','name','','text','autocomplete="name" required maxlength="100"')+mail+
       field('Telefone','phone','','tel','autocomplete="tel" required maxlength="24"')+secret+confirm;
   } else if(recover) {
-    title='Recuperação de senha';sub='Na demonstração, o link é registrado na caixa de saída local da instância.';
+    title='Recuperação de senha';sub=production?(state.data.accountEmailEnabled?'Informe seu e-mail para receber um link de recuperação.':'A recuperação por e-mail ainda não está disponível. Entre em contato com a equipe.'):'Na demonstração, o link é registrado na caixa de saída local da instância.';
     code='recover';fields=mail;
   } else if(reset) {
     title='Defina uma nova senha';sub='O link de recuperação só pode ser usado uma vez.';code='reset';fields=secret+confirm;
   } else if(verify) {
-    title='Confirme seu e-mail';sub='Use o link de verificação da caixa de saída local.';code='verify';
+    title='Confirme seu e-mail';sub=production?'Confirme o e-mail associado à sua conta.':'Use o link de verificação da caixa de saída local.';code='verify';
   } else fields=mail+secret;
   const cta={login:'Entrar',register:'Criar conta',recover:'Solicitar recuperação',reset:'Salvar nova senha',verify:'Confirmar e-mail',redeem:'Ativar conta'}[code];
   return `<div class="auth-layout"><aside class="auth-image">${img('/assets/norden-original.png','Logotipo oficial do NORDEN','', 'fetchpriority="high"')}</aside>
     <div class="auth-body">${eyebrow('CONTA NORDEN')}<h1>${title}</h1><p>${sub}</p>
-    ${form(code,hidden('target',target)+hidden('token',token)+fields+button(cta))}
-    <div class="actions auth-links">${code==='login'?link('/recuperar-senha','Esqueci minha senha','text-button')+link('/cadastro'+(target?'?voltar='+encodeURIComponent(target):''),'Criar conta','text-button'):
-      link('/login'+(target?'?voltar='+encodeURIComponent(target):''),'Ir para login','text-button')}</div>
+    ${recover&&production&&!state.data.accountEmailEnabled?'':form(code,hidden('target',target)+hidden('token',token)+hidden('area',production&&code==='login'?(staff?'gerencia':'cliente'):'')+fields+button(cta))}
+    <div class="actions auth-links">${code==='login'?(!production||state.data.accountEmailEnabled?link('/recuperar-senha','Esqueci minha senha','text-button'):'')+(!staff?link((production?'/usuario/cadastro':'/cadastro')+(target?'?voltar='+encodeURIComponent(target):''),'Criar conta','text-button'):''):
+      link((production?'/usuario/entrar':'/login')+(target?'?voltar='+encodeURIComponent(target):''),'Ir para login','text-button')}</div>
+    ${production&&code==='login'?`<aside class="account-intro"><span>${staff?'Veja como a gerência funciona com Rafael Almeida.':'Conheça sua área com o exemplo de Lucas Martins.'}</span>${link(demoHref(staff),'Ver demonstração','text-button')}</aside>`:''}
     ${isRegister?notice('Consulte a política de privacidade para saber como os dados são usados.')+link('/privacidade','Política de privacidade','text-button'):''}
     </div></div>`;
 }
@@ -169,11 +181,17 @@ export function publicPage(parts) {
     <div class="gallery-grid">${lines(state.data.catalog.gallery.filter(x=>x.authorized&&x.active),galleryItem,empty('Sem imagens disponíveis'))}</div>`;
   if(page==='contato') return `${pageHead('Contato','Informações do salão e perguntas frequentes.')}
     <div class="split"><div class="panel">${contactInfo(state.data.catalog.info)}${link('/app/agendar','Agendar horário','button primary')}</div><div class="panel">${faq(state.data.catalog.info)}</div></div>`;
+  if(page==='privacidade'&&state.data.production) return `${pageHead('Privacidade','Como os dados são usados no NORDEN.')}<div class="text-content">
+    <h2>Conta, agenda e loja</h2><p>Usamos seu nome, contato e dados de entrega para manter a conta, executar agendamentos e acompanhar pedidos.</p>
+    <h2>Cuidados e histórico</h2><p>Alertas de saúde são opcionais e cifrados. Fotos privadas exigem sua autorização. Esses dados ficam disponíveis apenas para você e para a equipe autorizada no atendimento.</p>
+    <h2>Seus dados</h2><p>No perfil, você pode atualizar dados, retirar consentimentos e solicitar acesso, correção ou exclusão.</p>${link('/app/perfil','Gerenciar minha privacidade','button outline')}</div>`;
   if(page==='privacidade') return `${pageHead('Privacidade','Regras do ambiente de demonstração.')}<div class="text-content">
     <h2>Finalidade e acesso</h2><p>A conta registra perfil, reservas, atendimentos e pedidos fictícios. Alertas de alergia são opcionais, ficam em um registro protegido e são acessíveis ao cliente e à equipe autorizada no atendimento.</p>
     <h2>Consentimento e solicitações</h2><p>O perfil permite retirar o consentimento dos alertas, alterar preferências e solicitar acesso, correção ou exclusão. A gestão acompanha a solicitação na área administrativa.</p>
     <h2>Retenção</h2><p>Os prazos e a base legal para uma operação comercial dependem de definição antes da entrada em produção. Nesta instância, utilize dados fictícios.</p>
     ${link('/app/perfil','Gerenciar minha privacidade','button outline')}</div>`;
+  if(page==='termos'&&state.data.production) return `${pageHead('Agendamentos e pedidos','Consulte as condições antes de confirmar.')}<div class="text-content">
+    <p>O agendamento exibe o serviço, o preço e o prazo de cancelamento antes da confirmação.</p><p>O pedido informa a modalidade de recebimento, o valor e a condição de pagamento antes de ser registrado. Para entrega, a taxa é estimada a partir da distância informada.</p></div>`;
   if(page==='termos') return `${pageHead('Termos da demonstração','Condições para experimentar o NORDEN.')}<div class="text-content">
     <p>Serviços, disponibilidade, profissionais, imagens, preços e produtos são ilustrativos. Os agendamentos ocorrem apenas na instância de demonstração.</p>
     <p>O checkout usa pagamento simulado ou presencial de referência, sem cobrança. Na entrega, a distância é informada para simular o cálculo, sem validação por mapas.</p>

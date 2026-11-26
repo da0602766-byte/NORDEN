@@ -1,6 +1,8 @@
 export const state={data:null,route:'',draft:null,adminSlots:null,quote:null,checkout:null};
 export const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 export const money=n=>(Number(n)/100).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+export const liveRoute=href=>state.data?.production?href.replace(/^\/app(?=\/|[?#]|$)/,'/usuario').replace(/^\/gestao(?=\/|[?#]|$)/,'/gerencia'):href;
+export const internalRoute=href=>href.replace(/^\/usuario(?=\/|[?#]|$)/,'/app').replace(/^\/gerencia(?=\/|[?#]|$)/,'/gestao');
 export const label=value=>({
   CONFIRMADO:'Confirmado',CANCELADO:'Cancelado',EM_ATENDIMENTO:'Em atendimento',CONCLUIDO:'Concluído',
   NAO_COMPARECEU:'Não compareceu',OFERTADA:'Aguardando resposta',EFETIVADA:'Realocação confirmada',RECUSADA:'Recusada',

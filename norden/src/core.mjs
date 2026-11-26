@@ -19,7 +19,7 @@ export function str(value, label, max = 300, min = 0) {
   return value.trim();
 }
 export function integer(value, label, min = 0, max = 1_000_000_000) {
-  if (value === '' || value === null || !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max) {
+  if ((typeof value!=='number'&&(typeof value!=='string'||!value.trim())) || !Number.isSafeInteger(Number(value)) || Number(value) < min || Number(value) > max) {
     fail('Confira o campo ' + label + '.');
   }
   return Number(value);
@@ -78,10 +78,10 @@ export function openDatabase(filename, options = {}) {
     get:(query,...params)=>db.prepare(query).get(...params),
     all:(query,...params)=>db.prepare(query).all(...params),
     run:(query,...params)=>db.prepare(query).run(...params),
-    tx(callback) {
+    async tx(callback) {
       db.exec('BEGIN IMMEDIATE');
       try {
-        const result = callback();
+        const result = await callback();
         db.exec('COMMIT');
         return result;
       } catch (error) {
@@ -91,18 +91,34 @@ export function openDatabase(filename, options = {}) {
     }
   };
   for (const file of readdirSync(migrations).sort()) {
-    sql.tx(() => {
-      if (sql.get('SELECT 1 FROM migrations WHERE file=?',file)) return;
+    if (sql.get('SELECT 1 FROM migrations WHERE file=?',file)) continue;
+    db.exec('BEGIN IMMEDIATE');
+    try {
       db.exec(readFileSync(new URL(file,migrations),'utf8'));
       sql.run('INSERT INTO migrations VALUES(?)',file);
-    });
+      db.exec('COMMIT');
+    } catch(error) {
+      db.exec('ROLLBACK');
+      throw error;
+    }
   }
   sql.run('INSERT OR IGNORE INTO settings VALUES(1,?)',encode(defaultSettings));
   const secret = options.secret || (filename === ':memory:' ? token() : localSecret(dirname(filename)));
-  const encryptionKey = createHash('sha256').update(secret).digest();
+  let pending=Promise.resolve();
   return Object.assign(sql,{
     settings:()=>({...defaultSettings,...parse(sql.get('SELECT value FROM settings WHERE id=1').value)}),
     close:()=>db.close(),
+    serialize(callback) {
+      const result=pending.then(callback);
+      pending=result.catch(()=>{});
+      return result;
+    },
+    ...encryption(secret)
+  });
+}
+export function encryption(secret) {
+  const encryptionKey = createHash('sha256').update(secret).digest();
+  return {
     encrypt(value) {
       const iv = randomBytes(12);
       const cipher = createCipheriv('aes-256-gcm',encryptionKey,iv);
@@ -115,7 +131,7 @@ export function openDatabase(filename, options = {}) {
       cipher.setAuthTag(bytes.subarray(12,28));
       return parse(Buffer.concat([cipher.update(bytes.subarray(28)),cipher.final()]).toString('utf8'));
     }
-  });
+  };
 }
 function localSecret(dir) {
   const file = join(dir,'safety.key');
@@ -123,15 +139,15 @@ function localSecret(dir) {
   catch (error) { if (error.code !== 'EEXIST') throw error; }
   return readFileSync(file,'utf8');
 }
-export function audit(db,actor,action,entity,target) {
-  db.run('INSERT INTO audits VALUES(?,?,?,?,?,?)',id(),actor,action,entity,target,now());
+export async function audit(db,actor,action,entity,target) {
+  await db.run('INSERT INTO audits VALUES(?,?,?,?,?,?)',id(),actor,action,entity,target,now());
 }
-export function notify(db,user,title,href,key) {
+export async function notify(db,user,title,href,key) {
   if (!user) return;
-  db.run('INSERT OR IGNORE INTO notifications VALUES(?,?,?,?,?,NULL,?)',id(),user,title,href,now(),key);
+  await db.run('INSERT INTO notifications(id,account_id,title,href,created,read_at,dedupe) VALUES(?,?,?,?,?,NULL,?) ON CONFLICT(account_id,dedupe) DO NOTHING',id(),user,title,href,now(),key);
 }
-export function notifyManagers(db,title,href,key) {
-  for (const account of db.all("SELECT id FROM accounts WHERE role='gestor' AND active=1")) notify(db,account.id,title,href,key);
+export async function notifyManagers(db,title,href,key) {
+  for (const account of await db.all("SELECT id FROM accounts WHERE role='gestor' AND active=1")) await notify(db,account.id,title,href,key);
 }
 export function selection(value, allowed, label) {
   if (!allowed.includes(value)) fail('Selecione uma opção válida em ' + label + '.');

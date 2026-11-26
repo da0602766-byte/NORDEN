@@ -32,7 +32,7 @@ function dashboard() {
   if(manager()) metrics.push(['bag','Pedidos em preparação',orderPeriod.filter(o=>o.status==='EM_PREPARACAO').length,'/gestao/pedidos?'+new URLSearchParams({status:'EM_PREPARACAO',de:start,ate:end})],
     ['bag','Prontos para retirada',orderPeriod.filter(o=>o.status==='PRONTO_RETIRADA').length,'/gestao/pedidos?'+new URLSearchParams({status:'PRONTO_RETIRADA',de:start,ate:end})],
     ['grid','Estoque baixo',catalog.products.filter(p=>p.active&&p.available<=p.threshold).length,'/gestao/estoque?baixo=1']);
-  return `${staffHead('Visão geral','Olá, '+user.name.split(' ')[0]+'. Acompanhe a operação deste ambiente de demonstração.',link('/gestao/agenda','Abrir agenda','button primary','calendar'))}
+  return `${staffHead('Visão geral','Olá, '+user.name.split(' ')[0]+'. Acompanhe a operação do salão.',link('/gestao/agenda','Abrir agenda','button primary','calendar'))}
   ${form('urlFilter',`<div class="filters">${field('Início','de',start,'date')}${field('Fim','ate',end,'date')}
   ${manager()?select('Profissional','profissional',[['','Todos'],...catalog.professionals.map(p=>[p.id,p.name])],prof):''}${button('Aplicar','button outline')}</div>`)}
   <div class="metrics">${metrics.map(([glyph,title,count,href])=>`<a href="${esc(href)}">${icon(glyph)}<strong>${count}</strong><span>${title}</span></a>`).join('')}</div>
@@ -164,6 +164,8 @@ const basic=(entity,row)=>field('Nome','name',row.name??'','text','required maxl
   textarea(entity==='profissional'?'Apresentação':'Descrição','description',row.description??'','required')+
   check('Ativo no catálogo','active',row.active!==0);
 const amount=(title,key,value='',min=0)=>field(title,key,value,'number',`min="${min}" step="1" ${key==='promo'?'':'required'}`);
+const price=(title,key,value)=>field(title,key,value==null?'':(value/100).toFixed(2),'number',`min="0" max="10000000" step="0.01" data-reais ${key==='promo'?'':'required'}`);
+const prices=item=>pair(price('Preço (R$)','price',item.price),price('Preço promocional (R$)','promo',item.promo));
 const linksFor=(entity,ref)=>data().catalog.compatibility.filter(x=>x[entity+'_id']===ref).map(x=>x[entity==='service'?'professional_id':'service_id']);
 const goodsFor=ref=>data().catalog.serviceProducts.filter(x=>x.service_id===ref).map(x=>x.product_id);
 const servicesFor=ref=>data().catalog.serviceProducts.filter(x=>x.product_id===ref).map(x=>x.service_id);
@@ -178,14 +180,14 @@ function catalogPage(type,ref) {
   const item=ref==='novo'?{}:find(table,ref);
   if(!item) return empty('Registro indisponível');
   let fields=basic(table==='professionals'?'profissional':name,item);
-  if(table==='services') fields+=pair(amount('Preço em centavos','price',item.price),amount('Duração em minutos','duration',item.duration??45,15),
+  if(table==='services') fields+=pair(price('Preço (R$)','price',item.price),amount('Duração em minutos','duration',item.duration??45,15),
     amount('Intervalo técnico em minutos','padding',item.padding??0))+textarea('Orientações iniciais','instructions',item.instructions??'')+
     multi('Profissionais habilitados','professionals',asChoices(data().catalog.professionals),linksFor('service',ref))+
     multi('Produtos compatíveis','products',asChoices(data().catalog.products),goodsFor(ref));
   if(table==='professionals') fields+=field('Especialidades','specialty',item.specialty??'','text','required')+
     field('Imagem autorizada (URL HTTPS ou /assets)','image',item.image??'')+multi('Serviços habilitados','services',asChoices(data().catalog.services),linksFor('professional',ref));
   if(table==='products') fields+=pair(field('SKU','sku',item.sku??'','text','required'),field('Marca','brand',item.brand??'NORDEN','text','required'),
-    amount('Preço em centavos','price',item.price),amount('Preço promocional em centavos','promo',item.promo??''),
+    price('Preço (R$)','price',item.price),price('Preço promocional (R$)','promo',item.promo),
     field('Tamanho ou unidade','size',item.size??''),amount('Alerta de estoque baixo','threshold',item.threshold??3))+
     field('Imagem (URL HTTPS ou /assets)','image',item.image??'')+textarea('Ingredientes','ingredients',item.ingredients??'')+
     textarea('Modo de uso','usage',item.usage??'')+textarea('Alertas','warnings',item.warnings??'')+
@@ -223,7 +225,8 @@ function stock() {
   return `${staffHead('Estoque','Acompanhe saldos, reservas e movimentos auditados.')}
     ${form('urlFilter',`<div class="filters">${select('Produto','produto',[['','Todos'],...asChoices(data().catalog.products)],ref)}
       ${select('Disponibilidade','baixo',[['','Todas'],['1','Estoque baixo']],isLow)}${button('Filtrar','button outline')}</div>`)}
-    <div class="split section-gap"><section class="panel"><h2>Saldos atuais</h2>${lines(products,p=>row(p.name,p.physical+' físico · '+p.reserved+' reservado',`<span>${p.available} disponíveis</span>`,'/gestao/estoque?produto='+p.id),empty('Nenhum item nesta visão'))}</section>
+    <div class="split section-gap"><section class="panel"><h2>Saldos atuais</h2>${lines(products,p=>`<div class="stock-product">${row(p.name,p.physical+' físico · '+p.reserved+' reservado',`<span>${p.available} disponíveis</span>`,'/gestao/estoque?produto='+p.id)}
+    <details class="stock-price"><summary>${money(p.promo??p.price)} · Alterar preço</summary>${form('productPrice',hidden('id',p.id)+prices(p)+button('Salvar preço','button primary small'))}</details></div>`,empty('Nenhum item nesta visão'))}</section>
     <section class="panel"><h2>Movimentar estoque</h2>${form('inventory',select('Produto','productId',titleOptions(data().catalog.products),ref,'required')+
       select('Movimento','kind',[['ENTRADA','Entrada'],['AJUSTE','Ajuste de saldo'],['DEVOLUCAO','Devolução conferida']])+
       amount('Quantidade (ajuste pode ser negativo)','quantity','',-99999)+textarea('Motivo','reason','','required')+button('Registrar movimento'))}</section></div>
@@ -266,7 +269,7 @@ function settings() {
   const nums=[['Antecedência para agendar (min)','leadMinutes'],['Horizonte da agenda (dias)','bookingDays'],['Prazo para cancelar (h)','cancellationHours'],
     ['Horizonte do Flow (dias)','flowDays'],['Validade da oferta (h)','offerHours'],['Tarifa por km (centavos)','deliveryRate'],
     ['Cobertura (km)','deliveryMax'],['Taxa base (centavos)','deliveryBase'],['Taxa mínima (centavos)','deliveryMinimum']];
-  return `${staffHead('Configurações','Parâmetros operacionais e conteúdo da demonstração.')}
+  return `${staffHead('Configurações','Parâmetros operacionais e conteúdo público.')}
   <div class="split"><section class="panel" id="conteudo"><h2>Salão e regras</h2>${form('settings',textarea('Título da página inicial (duas linhas)','headline',s.headline,'required')+
     textarea('Apresentação','introduction',s.introduction,'required')+pair(field('Endereço','address',s.address),field('Contato','contact',s.contact),
     field('Horário ao público','hoursText',s.hoursText))+textarea('Instruções de retirada','pickup',s.pickup)+

@@ -1,5 +1,5 @@
 import {state,esc,api,action,brand,icon,link,button,form,empty,dataOf,selected,checked,find,guestCart,saveCart,
-  cartCount,loadingView} from './ui.mjs';
+  cartCount,loadingView,liveRoute,internalRoute} from './ui.mjs';
 import {header,footer,landing,publicPage,authView,accountHome} from './public.mjs';
 import {clientPage,manualSections} from './client.mjs';
 import {adminPage} from './admin.mjs';
@@ -55,7 +55,7 @@ function revealSections() {
 }
 let observerByPage;
 function go(url,replace=false) {
-  const safe=onlyLocal(url);
+  const safe=liveRoute(onlyLocal(url));
   if(!safe) return;
   history[replace?'replaceState':'pushState'](null,'',safe);
   draw(true);
@@ -74,7 +74,7 @@ function workspace(body,path,admin) {
     <div class="side-foot">${link('/','Página inicial','side-link','home')}${form('logout',button('Sair','side-link'))}</div></aside>
     <div class="workspace-body"><header class="workspace-header"><div class="workspace-ident"><button type="button" class="icon-button area-menu" aria-label="Abrir menu da área" aria-expanded="false" data-command="sideMenu">${icon('menu')}</button>
     <a href="${home}" class="workspace-name">${admin?'Gestão NORDEN':'Minha área'}</a></div>
-    <div class="workspace-actions"><span class="demo-label">Demonstração</span>
+    <div class="workspace-actions">${state.data.production?'':'<span class="demo-label">Demonstração</span>'}
     <a href="${home+'/notificacoes'}" class="icon-button cart-icon" aria-label="Notificações, ${notifications} não lidas">${icon('bell')}${notifications?'<b>'+notifications+'</b>':''}</a>
     ${admin?'':`<a href="/app/carrinho" class="icon-button cart-icon" aria-label="Carrinho, ${cartCount()} ${cartCount()===1?'item':'itens'}">${icon('bag')}${cartCount()?'<b>'+cartCount()+'</b>':''}</a>`}
     <span class="user-initial" aria-label="${esc(user.name)}">${esc(user.name[0])}</span></div></header>
@@ -87,12 +87,14 @@ function publicLayout(body,wide=false) {
 function gate(path,admin) {
   if(state.data.user) return empty('Esta área usa outro perfil','Saia da conta atual para entrar com o perfil correspondente.',
     `<div class="actions">${link(accountHome(),'Minha área','button outline')}${form('logout',button('Sair da conta'))}</div>`);
-  return empty(admin?'Área da equipe NORDEN':'Entre na sua conta','Use seu acesso para abrir esta área.',
-    `<div class="actions">${link('/login?voltar='+encodeURIComponent(path),'Entrar','button primary')}${admin?'':link('/cadastro?voltar='+encodeURIComponent(path),'Criar conta','button outline')}</div>`);
+  const login=state.data.production?(admin?'/gerencia/entrar':'/usuario/entrar'):'/login';
+  const register=state.data.production?'/usuario/cadastro':'/cadastro';
+  return empty(admin?'Área da equipe NORDEN':'Entre na sua conta',admin?'O acesso à gerência é liberado por convite.':'Acesse seus agendamentos, cuidados e pedidos.',
+    `<div class="actions">${link(login+'?voltar='+encodeURIComponent(liveRoute(path)),'Entrar','button primary')}${admin?'':link(register+'?voltar='+encodeURIComponent(liveRoute(path)),'Criar conta','button outline')}</div>`);
 }
 async function draw(routeChange=false) {
   if(!state.data) return;
-  const stamp=++version,url=new URL(location.href),path=url.pathname.replace(/\/$/,'')||'/',parts=path.split('/').filter(Boolean);
+  const stamp=++version,url=new URL(location.href),path=internalRoute(url.pathname.replace(/\/$/,'')||'/'),parts=path.split('/').filter(Boolean);
   const previous=state.route;
   state.route=path;
   if(previous==='/app/checkout'&&path!==previous) { state.quote=null; state.checkout=null; }
@@ -117,12 +119,14 @@ async function draw(routeChange=false) {
     }
     if(stamp!==version) return;
     if(path==='/') body=publicLayout(landing(),true);
-    else if(['/login','/cadastro','/recuperar-senha','/conta/redefinir','/conta/verificar','/conta/convite'].includes(path)) body=publicLayout(authView(path),true);
-    else if(isAdmin) body=allows?workspace(adminPage(parts,detail),path,true):publicLayout(gate(path+url.search,true));
+    else if(['/login','/cadastro','/app/cadastro','/app/entrar','/gestao/entrar','/recuperar-senha','/conta/redefinir','/conta/verificar','/conta/convite'].includes(path)) body=publicLayout(authView(path),true);
+    else if(isAdmin) body=allows?workspace(adminPage(parts,detail),path,true):!user&&state.data.production?publicLayout(authView('/gestao/entrar',liveRoute(path+url.search)),true):publicLayout(gate(path+url.search,true));
+    else if(path==='/app'&&!user&&state.data.production) body=publicLayout(authView('/app/entrar'),true);
     else if(isClient) body=allows?workspace(clientPage(parts,detail),path,false):
       ['agendar','carrinho'].includes(parts[1])?publicLayout(clientPage(parts,detail)):publicLayout(gate(path+url.search,false));
     else body=publicLayout(publicPage(parts));
     app.innerHTML=body;
+    if(state.data.production) for(const anchor of app.querySelectorAll('a[href^="/"]')) anchor.setAttribute('href',liveRoute(anchor.getAttribute('href')));
     revealSections();
     app.removeAttribute('aria-busy');
     const title=app.querySelector('h1')?.textContent.trim();
@@ -234,10 +238,11 @@ async function importGuest() {
   await load();
 }
 const direct={
+  productPrice:['productPrice','Preço atualizado no catálogo.'],
   requestMove:['requestMove','Solicitação enviada.'],cancelBooking:['cancel','Agendamento cancelado.'],noShow:['noShow','Falta registrada.'],
   block:['block','Bloqueio criado.'],unblock:['block','Bloqueio removido.'],offer:['offer','Oferta enviada.'],
   privacy:['privacy','Solicitação registrada.'],privacyState:['privacyState','Solicitação atualizada.'],readNotifications:['readNotifications',''],
-  addressRemove:['address','Endereço removido.'],resend:['resend','Link registrado na caixa de saída local.'],
+  addressRemove:['address','Endereço removido.'],resend:['resend','Link de verificação solicitado.'],
   orderState:['orderState','Pedido atualizado.'],inventory:['inventory','Movimento de estoque registrado.'],
   photoRemove:['photo','Foto excluída.'],moderate:['moderate','Moderação salva.']
 };
@@ -258,6 +263,7 @@ function productInput(form,kind) {
   }).filter(p=>p.productId||p.name||p.amount||p.detail);
 }
 async function dispatch(name,form,fields,phase) {
+  for(const input of form.querySelectorAll('[data-reais]')) fields[input.name]=input.value===''?'':Math.round(Number(input.value)*100);
   if(name==='urlFilter'||name==='shopFilter') {
     const params=new URLSearchParams(Object.entries(fields).filter(([,value])=>value));
     go(state.route+(params.size?'?'+params:''));
@@ -267,19 +273,20 @@ async function dispatch(name,form,fields,phase) {
     const result=await action(name,fields);
     await load();
     await importGuest();
-    const target=onlyLocal(fields.target);
+    const target=internalRoute(onlyLocal(fields.target));
     if(target==='/app/agendar'&&state.draft?.step===4) {
       state.draft.slots=null;
       await draw();
     }
-    go(!target||((result.role&&result.role!=='cliente')&&target.startsWith('/app'))?accountHome():target,true);
-    if(name==='register') popup('Conta de demonstração criada.');
+    const incompatible=(state.data.user?.role==='cliente'&&target.startsWith('/gestao'))||(state.data.user?.role!=='cliente'&&target.startsWith('/app'));
+    go(!target||incompatible?accountHome():target,true);
+    if(name==='register') popup(state.data.production?'Conta criada.':'Conta de demonstração criada.');
     return;
   }
   if(name==='logout') { await action('logout'); await load(); go('/',true);popup('Sessão encerrada.');return; }
   if(name==='recover') {
     await action('recover',fields);
-    popup('Se a conta existir, o link ficará na caixa de saída local.');
+    popup(state.data.production?'Se a conta existir, enviaremos um link por e-mail.':'Se a conta existir, o link ficará na caixa de saída local.');
     form.reset();
     return;
   }

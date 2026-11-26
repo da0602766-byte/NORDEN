@@ -108,7 +108,7 @@ export const Footer: React.FC = () => {
 
         <div className="pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--text-muted)]">
           <p>© {new Date().getFullYear()} NORDEN Salão Masculino · Demonstração interativa</p>
-          <p>Privacidade · Termos de Uso · Dados fictícios</p>
+          <p>Criado por Douglas Anderson, Davi Alexandre, Waldemar Roberto e Cristian Pereira</p>
         </div>
       </div>
     </footer>

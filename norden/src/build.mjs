@@ -17,6 +17,6 @@ for(const directory of ['src','public','tests']) {
 }
 mkdirSync(output,{recursive:true});
 for(const directory of ['src','public','migrations','tests']) cpSync(join(root,directory),join(output,directory),{recursive:true});
-for(const file of ['package.json','README.md','QA.md','Iniciar_NORDEN_Windows.cmd']) cpSync(join(root,file),join(output,file));
+for(const file of ['package.json','package-lock.json','README.md','QA.md','Iniciar_NORDEN_Windows.cmd']) cpSync(join(root,file),join(output,file));
 writeFileSync(join(output,'.gitignore'),'data/\n');
 console.log('Build NORDEN em '+output);

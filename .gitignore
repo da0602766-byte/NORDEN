@@ -9,3 +9,5 @@
 *.key
 !preview/src/data/
 !preview/src/data/seedData.ts
+supabase/.temp/
+**/.vercel/

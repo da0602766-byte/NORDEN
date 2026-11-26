@@ -150,7 +150,7 @@ function profile() {
       textarea('Preferências de estilo e cuidados','preference',user.preference,'maxlength="900"')+
       check('Quero receber ofertas de antecipação de horário.','moveOk',Boolean(user.move_ok))+
       check('Autorizo fotos privadas para meu histórico quando eu confirmar com a equipe.','photoOk',Boolean(user.photo_ok))+button('Salvar perfil'))}
-      ${!user.verified?form('resend',notice('E-mail ainda não verificado. O link de demonstração fica na caixa de saída local.')+button('Gerar link de verificação','button outline')):banner('E-mail verificado.')}</section>
+      ${user.verified?banner('E-mail verificado.'):state.data.accountEmailEnabled?form('resend',notice('E-mail ainda não verificado.')+button('Enviar link de verificação','button outline')):''}</section>
     <section class="panel"><h2>Alergias e sensibilidades</h2>${form('safety',
       select('Tem alergias ou sensibilidades conhecidas?','status',[['','Selecione'],['sim','Sim'],['não','Não'],['não sei','Não sei'],['informar ao profissional','Prefiro informar ao profissional']],safety?.status??'')+
       textarea('Substâncias ou produtos conhecidos, se marcou Sim','details',safety?.details??'','maxlength="420"')+
@@ -203,7 +203,7 @@ function checkout() {
       select('Modalidade','mode',[['retirada','Retirada'],['entrega','Entrega']],d.mode,'data-watch="checkout"')+
       (d.mode==='entrega'?select('Endereço','addressId',[['','Novo endereço'],...addresses.map(a=>[a.id,a.label])],d.addressId??'','data-watch="checkout"')+
         (d.addressId?'':addressInputs(d.address))+field('Distância estimada (km)','distance',d.distance??'','number','step="0.01" min="0.01" required')+
-        notice('Estimativa demonstrativa informada por você. Cobertura de até '+catalog.info.deliveryMax+' km.'):`<p>${esc(pickup)}</p>`)+button('Calcular e revisar'))}
+        notice('Informe a distância estimada. Cobertura de até '+catalog.info.deliveryMax+' km.'):`<p>${esc(pickup)}</p>`)+button('Calcular e revisar'))}
       </section><aside class="panel quote-pane"><h2>Resumo do pedido</h2>${row('Subtotal','',money(quote?.subtotal??cart.subtotal))}
         ${row('Taxa',quote?.rules.estimated?quote.rules.distance+' km estimados':quote?'Retirada':'A calcular',quote?money(quote.fee):'—')}
         ${quote?rowsForQuote(quote):''}${row('Total','',quote?money(quote.total):'—')}${banner(catalog.info.payment==='simulado'?'Pagamento simulado. Nenhuma cobrança será realizada.':'Pagamento presencial. Nenhuma cobrança online.')}

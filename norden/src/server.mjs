@@ -44,65 +44,72 @@ async function bodyOf(request,max=40_000) {
     fail('Formulário inválido.');
   }
 }
-function boot(db,user) {
-  const data={user:identity(user),catalog:publicCatalog(db),today:local(now()).date};
+async function boot(db,user) {
+  const data={user:identity(user),catalog:await publicCatalog(db),today:local(now()).date};
   if(!user) return data;
-  data.bookings=listBookings(db,user);
-  data.flow=flowView(db,user);
-  data.notifications=db.all('SELECT id,title,href,created,read_at FROM notifications WHERE account_id=? ORDER BY created DESC,rowid DESC LIMIT 150',user.id);
-  if(user.role==='cliente') return {...data,journey:journey(db,user),cart:cart(db,user),orders:orders(db,user),addresses:addresses(db,user),
-    safety:ownSafety(db,user),privacy:db.all('SELECT id,kind,state,created FROM privacy_requests WHERE client_id=? ORDER BY created DESC',user.id)};
+  data.bookings=await listBookings(db,user);
+  data.flow=await flowView(db,user);
+  data.notifications=await db.all('SELECT id,title,href,created,read_at FROM notifications WHERE account_id=? ORDER BY created DESC,rowid DESC LIMIT 150',user.id);
+  if(user.role==='cliente') return {...data,journey:await journey(db,user),cart:await cart(db,user),orders:await orders(db,user),addresses:await addresses(db,user),
+    safety:await ownSafety(db,user),privacy:await db.all('SELECT id,kind,state,created FROM privacy_requests WHERE client_id=? ORDER BY created DESC',user.id)};
   staff(user);
   const pId=user.professional_id || '-';
-  if(user.role==='profissional') return {...data,clients:db.all(`SELECT DISTINCT a.id,a.name,a.phone
+  if(user.role==='profissional') return {...data,clients:await db.all(`SELECT DISTINCT a.id,a.name,a.phone
     FROM accounts a JOIN bookings b ON b.client_id=a.id WHERE b.professional_id=? AND a.active=1 ORDER BY a.name LIMIT 500`,pId)};
-  return {...data,catalog:publicCatalog(db,true),orders:orders(db,user),settings:db.settings(),
-    clients:db.all("SELECT id,name,email,phone,preference FROM accounts WHERE role='cliente' AND active=1 ORDER BY name LIMIT 500"),
-    hours:db.all('SELECT * FROM hours ORDER BY day,starts'),
-    blocks:db.all('SELECT * FROM blocks WHERE ends>? ORDER BY starts LIMIT 300',now()),
-    movements:db.all('SELECT m.*,p.name AS product_name,a.name AS actor_name FROM movements m JOIN products p ON p.id=m.product_id LEFT JOIN accounts a ON a.id=m.actor ORDER BY m.at DESC,m.rowid DESC LIMIT 300'),
-    templates:db.all('SELECT * FROM templates ORDER BY updated DESC,rowid DESC LIMIT 250').map(row=>({...row,sections:parse(row.sections)})),
-    audits:db.all('SELECT g.*,a.name AS actor_name FROM audits g LEFT JOIN accounts a ON a.id=g.actor ORDER BY g.at DESC,g.rowid DESC LIMIT 300'),
-    privacy:db.all('SELECT p.*,a.name AS client_name FROM privacy_requests p JOIN accounts a ON a.id=p.client_id ORDER BY p.created DESC LIMIT 250'),
-    reviews:db.all("SELECT r.*,b.service_name FROM reviews r JOIN bookings b ON b.id=r.booking_id WHERE r.publish_ok=1 ORDER BY r.updated DESC LIMIT 150")
+  return {...data,catalog:await publicCatalog(db,true),orders:await orders(db,user),settings:await db.settings(),
+    clients:await db.all("SELECT id,name,email,phone,preference FROM accounts WHERE role='cliente' AND active=1 ORDER BY name LIMIT 500"),
+    hours:await db.all('SELECT * FROM hours ORDER BY day,starts'),
+    blocks:await db.all('SELECT * FROM blocks WHERE ends>? ORDER BY starts LIMIT 300',now()),
+    movements:await db.all('SELECT m.*,p.name AS product_name,a.name AS actor_name FROM movements m JOIN products p ON p.id=m.product_id LEFT JOIN accounts a ON a.id=m.actor ORDER BY m.at DESC,m.rowid DESC LIMIT 300'),
+    templates:(await db.all('SELECT * FROM templates ORDER BY updated DESC,rowid DESC LIMIT 250')).map(row=>({...row,sections:parse(row.sections)})),
+    audits:await db.all('SELECT g.*,a.name AS actor_name FROM audits g LEFT JOIN accounts a ON a.id=g.actor ORDER BY g.at DESC,g.rowid DESC LIMIT 300'),
+    privacy:await db.all('SELECT p.*,a.name AS client_name FROM privacy_requests p JOIN accounts a ON a.id=p.client_id ORDER BY p.created DESC LIMIT 250'),
+    reviews:await db.all("SELECT r.*,b.service_name FROM reviews r JOIN bookings b ON b.id=r.booking_id WHERE r.publish_ok=1 ORDER BY r.updated DESC LIMIT 150")
   };
 }
-export function createServer({db,secure=false,outbox}={}) {
+export function createHandler({db,secure=false,outbox,deliver,production=false}={}) {
   const attempts=new Map();
-  return http.createServer(async(req,res)=>{
+  const handle=async(req,res)=>{
     try {
       const url=new URL(req.url,'http://localhost');
-      const path=url.pathname;
+      const routed=url.pathname==='/api/norden'?url.searchParams.get('__norden_path'):'';
+      const path=routed?'/api/'+routed:url.pathname;
+      url.searchParams.delete('__norden_path');
       const raw=cookie(req.headers.cookie);
-      const user=path.startsWith('/api/')?session(db,raw):null;
+      const user=path.startsWith('/api/')?await session(db,raw):null;
       if(req.method==='POST' && path.startsWith('/api/action/')) {
         if(!req.headers['x-norden-request'] || !(req.headers['content-type']??'').startsWith('application/json') ||
           ![undefined,'same-origin','none'].includes(req.headers['sec-fetch-site'])) fail('Origem da solicitação inválida.',403);
         const name=path.slice('/api/action/'.length);
         if(!Object.hasOwn(actions,name)) fail('Ação indisponível.',404);
         if(['login','register','recover','reset','redeem','resend'].includes(name)) {
-          const key=(req.socket.remoteAddress ?? '')+':'+name;
-          const time=now();
-          if(attempts.size>1000) for(const [k,v] of attempts) if(v.expiry<=time) attempts.delete(k);
-          const previous=attempts.get(key);
-          const bucket=previous?.expiry>time?previous:{count:0,expiry:time+15*60_000};
-          if(++bucket.count>18) fail('Muitas tentativas. Aguarde alguns minutos.',429);
-          attempts.set(key,bucket);
+          const ip=production?(req.headers['x-vercel-forwarded-for']?.split(',')[0]?.trim()||req.socket.remoteAddress):req.socket.remoteAddress;
+          const key=(ip ?? '')+':'+name;
+          if(db.authAttempt) {
+            if(await db.authAttempt(key)>18) fail('Muitas tentativas. Aguarde alguns minutos.',429);
+          } else {
+            const time=now();
+            if(attempts.size>1000) for(const [k,v] of attempts) if(v.expiry<=time) attempts.delete(k);
+            const previous=attempts.get(key);
+            const bucket=previous?.expiry>time?previous:{count:0,expiry:time+15*60_000};
+            if(++bucket.count>18) fail('Muitas tentativas. Aguarde alguns minutos.',429);
+            attempts.set(key,bucket);
+          }
         }
         const data=await bodyOf(req,name==='photo'?2_810_000:40_000);
-        const result=await actions[name](db,data,user,{raw,outbox});
+        const result=await actions[name](db,data,user,{raw,outbox,deliver,production});
         if (Object.hasOwn(result,'cookie')) return reply(res,result.data,200,undefined,{'Set-Cookie':setSession(result.cookie,secure)});
         return reply(res,result);
       }
       if(req.method==='GET' && path.startsWith('/api/')) {
-        if(path==='/api/boot') return reply(res,boot(db,user));
-        if(path==='/api/disponibilidade') return reply(res,availability(db,Object.fromEntries(url.searchParams),user));
+        if(path==='/api/boot') return reply(res,{...await boot(db,user),production,accountEmailEnabled:Boolean(outbox||deliver)});
+        if(path==='/api/disponibilidade') return reply(res,await availability(db,Object.fromEntries(url.searchParams),user));
         const [, , resource, ref, extra]=path.split('/');
         if(!ref||extra) fail('Registro indisponível.',404);
-        if(resource==='reserva') return reply(res,bookingDetails(db,ref,user));
-        if(resource==='pedido') return reply(res,orderDetails(db,ref,user));
+        if(resource==='reserva') return reply(res,await bookingDetails(db,ref,user));
+        if(resource==='pedido') return reply(res,await orderDetails(db,ref,user));
         if(resource==='foto') {
-          const media=readMedia(db,ref,user);
+          const media=await readMedia(db,ref,user);
           return reply(res,Buffer.from(media.content),200,media.mime);
         }
         fail('Recurso indisponível.',404);
@@ -124,13 +131,16 @@ export function createServer({db,secure=false,outbox}={}) {
       return reply(res,req.method==='HEAD'?null:readFileSync(resolve(publicRoot,'index.html')),200,mimes['.html']);
     } catch (error) {
       if(res.headersSent) return res.end();
-      const conflict=error.message.includes('Agenda indisponível');
+      const conflict=error.code==='23P01'||error.message.includes('Agenda indisponível');
+      if(error.code==='23P01') error.message='Este horário acabou de ficar indisponível. Escolha outro.';
       const status=error.status || (conflict?409:500);
       if(status===500) console.error('Erro interno NORDEN',error.code || error.name);
       reply(res,{error:status===500?'Ocorreu uma falha interna. Tente novamente.':error.message},status);
     }
-  });
+  };
+  return (req,res)=>db.serialize&&req.url.startsWith('/api/')?db.serialize(()=>handle(req,res)):handle(req,res);
 }
+export function createServer(options) { return http.createServer(createHandler(options)); }
 if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   if(process.env.NODE_ENV==='production') throw new Error('Esta entrega está configurada para avaliação e homologação isoladas.');
   const folder=resolve(process.env.NORDEN_DATA || 'data');

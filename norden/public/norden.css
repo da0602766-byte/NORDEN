@@ -133,3 +133,13 @@ h2 {font-size:clamp(1.5rem,2.5vw,2.4rem)}
 @media(max-width:720px) {.norden-hero-grid {grid-template-columns:1fr;padding-block:2.5rem 4rem;gap:2.5rem}.norden-hero h1 {font-size:clamp(3rem,10vw,4.4rem)}.hero-photo {height:390px}.connected-card {left:1rem;bottom:-1.3rem}.norden-hero-copy>p {font-size:1rem}.hero-editorial {margin-bottom:.5rem}.product-grid {grid-template-columns:repeat(2,minmax(0,1fr))}.journey-overview {grid-template-columns:1fr;gap:1rem;padding:1.3rem}.journey-next {padding:1rem 0 0;border-left:0;border-top:1px solid var(--edge)}.journey-legend {gap:.7rem;font-size:.75rem}.journey-timeline {padding-left:1.2rem}.journey-timeline>li:before {left:-1.6rem}.journey-session {padding:1.1rem}.session-products>section {padding:.8rem}.session-footer .actions {width:100%}.session-footer .button {flex:1}.page-head-line {flex-wrap:wrap}.page-head-line>.actions {margin-top:.5rem}.pro-grid {grid-template-columns:1fr}}
 @media(max-width:430px) {.product-grid {grid-template-columns:1fr}.module-grid {grid-template-columns:1fr}.hero-photo {height:330px}.norden-hero .actions .button {width:100%}.experience-tag {font-size:.64rem;letter-spacing:.07em}.editorial-caption {left:1.4rem}.editorial-caption strong {font-size:1.4rem}.journey-session h2 {font-size:1.3rem}.session-footer .actions {flex-direction:column}.session-footer .button {width:100%}.journey-session-head .status {font-size:.7rem}}
 @media(prefers-reduced-motion:reduce) {*,*:before,*:after {animation:none!important;transition:none!important;scroll-behavior:auto!important}.product-card:hover,.ecosystem-card:hover,.product-card:hover img {transform:none}.product-image-hint {transform:translateX(-50%)}}
+.service-product-links {display:flex; flex-wrap:wrap; column-gap:.75rem; row-gap:.25rem; margin-top:.45rem;}
+.service-product-link {color:var(--accent-ink); font-size:.83rem; font-weight:600; border-radius:3px; background:#b8916826; box-shadow:0 0 0 2px #b8916826; text-decoration:underline; text-underline-offset:2px;}
+.service-product-link:hover,.service-product-link:focus-visible {color:var(--ink); background:#b8916844;}
+.stock-price {padding:.35rem 0 .65rem;}
+.stock-price summary {color:var(--accent-ink); font-size:.9rem;}
+.stock-price .form {padding-top:.5rem;}
+.account-intro {display:flex; flex-wrap:wrap; align-items:center; gap:.25rem .7rem; margin-top:.85rem; padding:.8rem 0; border-top:1px solid var(--edge); color:var(--muted); font-size:.875rem;}
+.auth-image {overflow:hidden; position:relative; min-height:22rem;}
+.auth-image img {position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:cover;}
+@media(max-width:720px) {.auth-image {min-height:0; aspect-ratio:2.4;}.auth-image img {max-height:none;width:100%;}}

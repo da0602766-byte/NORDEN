@@ -230,7 +230,18 @@ export const NordenProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const setTheme = (next: 'dark' | 'light') => setThemeState(next);
   const toggleTheme = () => setThemeState((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
-  const [role, setRole] = useState<UserRole>(saved?.role ?? 'visitor');
+  const [role, setRole] = useState<UserRole>(() => {
+    const profile = new URLSearchParams(window.location.search).get('perfil');
+    if (profile === 'cliente') return 'client';
+    if (profile === 'gestor') return 'manager';
+    return saved?.role ?? 'visitor';
+  });
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('perfil')) return;
+    url.searchParams.delete('perfil');
+    window.history.replaceState(window.history.state, '', url);
+  }, []);
   const currentView = (
     (requestedView === 'client' && role !== 'client') ||
     (requestedView === 'manager' && role !== 'manager')

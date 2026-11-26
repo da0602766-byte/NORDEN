@@ -13,11 +13,11 @@ const address={zip:'00000-000',street:'Rua Fictícia',number:'10',district:'Bair
 async function fixture(t) {
   const folder=mkdtempSync(join(tmpdir(),'norden-test-'));
   const path=join(folder,'db.sqlite'),outbox=join(folder,'outbox');
-  const db=openDatabase(path);
+  const db=process.env.NORDEN_TEST_POSTGRES==='1'?(await (await import('./postgres-fixture.mjs')).testPostgres()).db:openDatabase(path);
   await seed(db,pass);
   const server=createServer({db,outbox});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
-  t.after(async()=>{await new Promise(resolve=>server.close(resolve));db.close();rmSync(folder,{recursive:true,force:true});});
+  t.after(async()=>{await new Promise(resolve=>server.close(resolve));await db.close();rmSync(folder,{recursive:true,force:true});});
   const endpoint='http://127.0.0.1:'+server.address().port;
   const sessions={};
   async function request(route,body,account,extra={}) {
@@ -57,7 +57,7 @@ const pickup={mode:'retirada',name:'Cliente de Teste',phone:'(00) 00000-0000'};
 
 test('páginas e arquivos servidos, catálogo público e política de origem',async t=>{
   const f=await fixture(t);
-  for(const pathname of ['/','/login','/servicos/corte','/app/jornada','/gestao/pedidos','/loja','/assets/hero.webp','/assets/norden-emblem.svg','/norden.css','/style.css','/app.mjs']) {
+  for(const pathname of ['/','/login','/usuario','/usuario/cadastro','/gerencia','/servicos/corte','/app/jornada','/gestao/pedidos','/loja','/assets/hero.webp','/assets/norden-emblem.svg','/norden.css','/style.css','/app.mjs']) {
     const r=await f.request(pathname);assert.equal(r.status,200,pathname);
     assert.equal(r.headers.get('x-content-type-options'),'nosniff');
   }
@@ -66,6 +66,24 @@ test('páginas e arquivos servidos, catálogo público e política de origem',as
   assert.equal(pub.catalog.professionals.some(p=>Object.hasOwn(p,'account_id')),false);
   assert.equal(pub.catalog.products.some(p=>Object.hasOwn(p,'reserved')),false);
   assert.equal((await f.post('recover',{email:'john@norden.example'},null,{'Sec-Fetch-Site':'cross-site'})).status,403);
+});
+test('portais validam o papel e só gestores alteram o preço publicado',async t=>{
+  const f=await fixture(t);
+  await f.act('login',{email:'cliente@norden.example',password:pass,area:'gerencia'},null,403);
+  await f.act('login',{email:'gestor@norden.example',password:pass,area:'cliente'},null,403);
+  await f.login(client);await f.login(manager);await f.login(staff);
+  const edit={id:'pomada',price:8425,promo:7990};
+  await f.act('productPrice',edit,client,403);
+  await f.act('productPrice',edit,staff,403);
+  await f.act('productPrice',{...edit,promo:9000},manager,400);
+  await f.act('productPrice',edit,manager);
+  const product=(await f.get('boot')).data.catalog.products.find(item=>item.id==='pomada');
+  assert.equal(product.price,8425);
+  assert.equal(product.promo,7990);
+  const saved=(await f.get('boot',manager)).data.audits;
+  assert.ok(saved.some(item=>item.action==='PRECO_PRODUTO_ATUALIZADO'&&item.target==='pomada'));
+  const bridged=(await f.get('norden?__norden_path=boot')).data;
+  assert.equal(bridged.catalog.products.find(item=>item.id==='pomada').price,8425);
 });
 test('cadastro cria só cliente, recuperação expira após uso e encerra sessões',async t=>{
   const f=await fixture(t);
@@ -91,13 +109,13 @@ test('autorização por registro, por papel e dados sensíveis cifrados',async t
   const f=await fixture(t);
   await Promise.all([f.login(client),f.login(other),f.login(staff),f.login(manager)]);
   await f.act('safety',{consent:true,status:'sim',details:'substância fictícia'},client);
-  assert.doesNotMatch(f.db.get('SELECT payload FROM safety').payload,/substância/);
+  assert.doesNotMatch((await f.db.get('SELECT payload FROM safety')).payload,/substância/);
   assert.equal((await f.get('reserva/demo-candidato',other)).status,404);
   assert.equal((await f.get('reserva/demo-historico',staff)).status,404);
   assert.equal((await f.get('reserva/demo-candidato',staff)).data.safety.details,'substância fictícia');
   assert.equal((await f.get('boot',manager)).data.clients.some(c=>Object.hasOwn(c,'safety')),false);
   assert.equal((await f.get('reserva/demo-historico',client)).data.treatment.private_note,undefined);
-  assert.equal(f.db.get("SELECT COUNT(*) n FROM audits WHERE action='ALERTA_CONSULTADO'").n,1);
+  assert.equal((await f.db.get("SELECT COUNT(*) n FROM audits WHERE action='ALERTA_CONSULTADO'")).n,1);
   await f.act('inventory',{},staff,403);
   await f.act('safety',{consent:false},client);
   assert.equal((await f.get('boot',client)).data.safety,null);
@@ -126,7 +144,7 @@ test('agenda calcula duração, intervalo, fuso, catálogos e reservas concorren
   assert.equal(detail.ends-detail.starts,3600000);
   assert.equal(new Date(dateTime(b.date,b.clock)).toISOString().slice(11,16),'13:00');
   assert.equal(detail.preferences[0].name,'Pomada Matte');
-  assert.equal(f.db.get('SELECT COUNT(*) n FROM orders').n,0);
+  assert.equal((await f.db.get('SELECT COUNT(*) n FROM orders')).n,0);
   const slots=(await f.get(url,other)).data.slots.map(x=>x.clock);
   assert.ok(!slots.includes('10:45'));assert.ok(slots.includes('11:00'));
 });
@@ -137,7 +155,7 @@ test('bloqueio, preço alterado, inatividade e horários passados são revalidad
   await f.act('book',b,client,409);
   await f.act('book',{...b,clock:'11:00',price:1},client,409);
   await f.act('book',{...b,date:addDays(local(now()).date,-2)},client,409);
-  f.db.run("UPDATE professionals SET active=0 WHERE id='andre'");
+  await f.db.run("UPDATE professionals SET active=0 WHERE id='andre'");
   await f.act('book',{...b,clock:'11:00'},client,409);
 });
 test('Flow sugere encaixe de 45, exclui 90 e confirma troca com histórico',async t=>{
@@ -156,13 +174,13 @@ for(const outcome of ['recusa','expiração','ocupação']) test('Flow preserva 
   const f=await fixture(t);await Promise.all([f.login(client),f.login(manager),f.login(other)]);
   await f.act('cancel',{id:'demo-vaga'},manager);
   const offer=await f.act('offer',{vacancyId:'demo-vaga',bookingId:'demo-candidato'},manager);
-  const old=f.db.get("SELECT starts FROM bookings WHERE id='demo-candidato'").starts;
-  const proposal=f.db.get("SELECT starts FROM bookings WHERE id='demo-vaga'").starts;
-  if(outcome==='expiração') f.db.run('UPDATE flow SET expiry=? WHERE id=?',now()-1,offer.id);
+  const old=(await f.db.get("SELECT starts FROM bookings WHERE id='demo-candidato'")).starts;
+  const proposal=(await f.db.get("SELECT starts FROM bookings WHERE id='demo-vaga'")).starts;
+  if(outcome==='expiração') await f.db.run('UPDATE flow SET expiry=? WHERE id=?',now()-1,offer.id);
   if(outcome==='ocupação') await f.act('book',booking({date:local(proposal).date,clock:local(proposal).clock}),other);
   const result=await f.act('answer',{id:offer.id,decision:outcome==='recusa'?'recusar':'aceitar'},client);
   assert.equal(result.status,outcome==='recusa'?'RECUSADA':'EXPIRADA');
-  assert.equal(f.db.get("SELECT starts FROM bookings WHERE id='demo-candidato'").starts,old);
+  assert.equal((await f.db.get("SELECT starts FROM bookings WHERE id='demo-candidato'")).starts,old);
 });
 test('atendimento concluído uma vez, Journey e Care congelados, notas restritas',async t=>{
   const f=await fixture(t);
@@ -205,25 +223,25 @@ test('carrinho, entrega estimada, preço alterado e pedido idempotente',async t=
   const q=await f.act('quote',delivery(),client);
   assert.equal(q.fee,1000);assert.equal(q.total,8900);
   const body={...delivery(),requestKey:'pedido-unico-entrega-1',quoteKey:q.key,total:1};
-  f.db.run("UPDATE products SET price=8200 WHERE id='pomada'");
+  await f.db.run("UPDATE products SET price=8200 WHERE id='pomada'");
   await f.act('checkout',body,client,409);
   body.quoteKey=(await f.act('quote',delivery(),client)).key;
   const result=await f.act('checkout',body,client);
   assert.equal((await f.act('checkout',body,client)).id,result.id);
   assert.equal((await f.get('pedido/'+result.id,other)).status,404);
   const order=(await f.get('pedido/'+result.id,client)).data;
-  assert.equal(order.total,9200);assert.equal(order.financial,'SIMULADO');
+  assert.equal(order.total,9200);assert.equal(order.financial,process.env.NORDEN_TEST_POSTGRES==='1'?'NAO_PAGO':'SIMULADO');
   assert.equal(order.quote.estimated,true);
-  assert.equal(f.db.get("SELECT reserved FROM products WHERE id='pomada'").reserved,1);
+  assert.equal((await f.db.get("SELECT reserved FROM products WHERE id='pomada'")).reserved,1);
   await f.act('orderState',{id:result.id,state:'EM_PREPARACAO'},manager);
   await f.act('orderState',{id:result.id,state:'SAIU_ENTREGA'},manager);
   await f.act('orderState',{id:result.id,state:'SAIU_ENTREGA'},manager);
-  assert.deepEqual(Object.values(f.db.get("SELECT physical,reserved FROM products WHERE id='pomada'")),[17,0]);
+  assert.deepEqual(Object.values(await f.db.get("SELECT physical,reserved FROM products WHERE id='pomada'")),[17,0]);
   await f.act('orderState',{id:result.id,state:'CONCLUIDO'},manager);
 });
 test('última unidade concorrente, retirada, cancelamento idempotente e baixa',async t=>{
   const f=await fixture(t);await Promise.all([f.login(client),f.login(other),f.login(manager)]);
-  f.db.run("UPDATE products SET physical=1 WHERE id='pente'");
+  await f.db.run("UPDATE products SET physical=1 WHERE id='pente'");
   for(const actor of [client,other]) await f.act('cartItem',{productId:'pente',quantity:1},actor);
   const quoteA=await f.act('quote',pickup,client),quoteB=await f.act('quote',pickup,other);
   assert.equal(quoteA.fee,0);
@@ -235,11 +253,11 @@ test('última unidade concorrente, retirada, cancelamento idempotente e baixa',a
   await f.act('orderState',{id:ref,state:'SAIU_ENTREGA'},manager,409);
   await f.act('orderState',{id:ref,state:'CANCELADO',reason:'Teste de cancelamento'},manager);
   await f.act('orderState',{id:ref,state:'CANCELADO',reason:'Repetição'},manager);
-  assert.deepEqual(Object.values(f.db.get("SELECT physical,reserved FROM products WHERE id='pente'")),[1,0]);
+  assert.deepEqual(Object.values(await f.db.get("SELECT physical,reserved FROM products WHERE id='pente'")),[1,0]);
   const next=await f.act('quote',pickup,results[0].status===200?other:client);
   const nextRef=(await f.act('checkout',{...pickup,quoteKey:next.key,requestKey:'retirada-concorrente-03'},results[0].status===200?other:client)).id;
   for(const state of ['EM_PREPARACAO','PRONTO_RETIRADA','CONCLUIDO','CONCLUIDO']) await f.act('orderState',{id:nextRef,state},manager);
-  assert.deepEqual(Object.values(f.db.get("SELECT physical,reserved FROM products WHERE id='pente'")),[0,0]);
+  assert.deepEqual(Object.values(await f.db.get("SELECT physical,reserved FROM products WHERE id='pente'")),[0,0]);
 });
 test('endereços e solicitações de privacidade pertencem ao cliente',async t=>{
   const f=await fixture(t);await Promise.all([f.login(client),f.login(other),f.login(manager)]);
@@ -345,7 +363,7 @@ test('Journey apresenta ficha e cartões sem expor notas internas ou alterar o h
   const shop=publicPage(['loja']);
   assert.match(shop,/\/assets\/pomada.webp/);
   assert.match(shop,/data-form="addProduct"/);
-  f.db.run("UPDATE products SET active=0,name='Nome atualizado' WHERE id='pomada'");
+  await f.db.run("UPDATE products SET active=0,name='Nome atualizado' WHERE id='pomada'");
   ui.state.data=(await f.get('boot',client)).data;
   globalThis.location={href:'http://localhost/app/jornada'};
   const archived=clientPage(['app','jornada']);

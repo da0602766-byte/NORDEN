@@ -482,7 +482,7 @@ export const LandingView: React.FC = () => {
                               onClick={() => {
                                 if (addToCart(prod.id, 1)) setCartOpen(true);
                               }}
-                              className="text-[var(--text-primary)] hover:text-[var(--accent)] underline decoration-[var(--border-strong)] underline-offset-4 transition-colors cursor-pointer"
+                              className="rounded-sm bg-[var(--accent)]/12 text-[var(--text-primary)] font-semibold ring-2 ring-[var(--accent)]/12 hover:bg-[var(--accent)]/25 underline decoration-[var(--accent)] underline-offset-4 transition-colors cursor-pointer"
                             >
                               {prod.name}
                             </button>
