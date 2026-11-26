@@ -1,4 +1,7 @@
 /* Interface adaptada de referencia/interface-original.html. */
+.pages-demo-bar {display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8rem;background:#211b16;color:#e7e2db;border-bottom:1px solid #8e6b47;padding:.8rem 1.2rem;font:14px/1.5 system-ui;position:relative;z-index:20}
+.pages-demo-bar strong,.pages-demo-bar span {display:block}.pages-demo-bar strong {font-size:12px;letter-spacing:.1em;color:#d0b18c}.pages-demo-bar nav {display:flex;gap:.4rem;flex-wrap:wrap}
+.pages-demo-bar button {font:inherit;color:#e7e2db;border:1px solid #6e5339;border-radius:7px;background:#151518;padding:.4rem .8rem;cursor:pointer}.pages-demo-bar button[aria-pressed=true] {background:#c4a582;color:#0b0b0d}
 :root {
   color-scheme:dark; --paper:#0b0b0d; --panel:#1a1a1e; --ink:#e7e2db;
   --muted:#b5aaa0; --edge:#393438; --sand:#c4a582; --accent-ink:#d0b18c;

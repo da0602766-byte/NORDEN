@@ -1,0 +1,152 @@
+{
+  "reserva/demo-longo": {
+    "booking": {
+      "id": "demo-longo",
+      "client_id": "demo-cliente-2",
+      "professional_id": "andre",
+      "service_id": "tratamento",
+      "service_name": "Tratamento capilar",
+      "professional_name": "André Ferraz",
+      "starts": 1795798800000,
+      "ends": 1795804200000,
+      "duration": 90,
+      "padding": 0,
+      "price": 15500,
+      "status": "CONFIRMADO",
+      "preferences": [],
+      "created": 1795651891124,
+      "reason": "",
+      "started": null,
+      "finished": null,
+      "client_name": "Mateus Castro"
+    },
+    "history": [
+      {
+        "type": "CONFIRMADO",
+        "at": 1795651891124,
+        "info": {}
+      }
+    ],
+    "media": [],
+    "treatment": null,
+    "profile": {
+      "preference": "",
+      "photo_ok": 0
+    },
+    "safety": null,
+    "template": {
+      "id": "manual-tratamento",
+      "service_id": "tratamento",
+      "title": "Cuidados após tratamento capilar",
+      "version": 1,
+      "sections": {
+        "instructions": "Siga a orientação de finalização demonstrada durante a sessão.",
+        "first": "Comece com pouca quantidade de produto e ajuste a aplicação conforme o acabamento desejado.",
+        "avoid": "Evite aplicar produtos que tenham provocado desconforto anteriormente.",
+        "maintenance": "Combine com seu profissional o melhor intervalo para a próxima sessão."
+      },
+      "active": 1,
+      "updated": 1795651891122
+    }
+  },
+  "reserva/demo-candidato": {
+    "booking": {
+      "id": "demo-candidato",
+      "client_id": "demo-cliente",
+      "professional_id": "andre",
+      "service_id": "corte",
+      "service_name": "Corte masculino",
+      "professional_name": "André Ferraz",
+      "starts": 1795788000000,
+      "ends": 1795790700000,
+      "duration": 45,
+      "padding": 0,
+      "price": 8500,
+      "status": "CONFIRMADO",
+      "preferences": [],
+      "created": 1795651891124,
+      "reason": "",
+      "started": null,
+      "finished": null,
+      "client_name": "Lucas Martins"
+    },
+    "history": [
+      {
+        "type": "CONFIRMADO",
+        "at": 1795651891124,
+        "info": {}
+      }
+    ],
+    "media": [],
+    "treatment": null,
+    "profile": {
+      "preference": "",
+      "photo_ok": 0
+    },
+    "safety": null,
+    "template": {
+      "id": "manual-corte",
+      "service_id": "corte",
+      "title": "Cuidados após corte masculino",
+      "version": 1,
+      "sections": {
+        "instructions": "Siga a orientação de finalização demonstrada durante a sessão.",
+        "first": "Comece com pouca quantidade de produto e ajuste a aplicação conforme o acabamento desejado.",
+        "avoid": "Evite aplicar produtos que tenham provocado desconforto anteriormente.",
+        "maintenance": "Combine com seu profissional o melhor intervalo para a próxima sessão."
+      },
+      "active": 1,
+      "updated": 1795651891122
+    }
+  },
+  "reserva/demo-vaga": {
+    "booking": {
+      "id": "demo-vaga",
+      "client_id": "demo-cliente-2",
+      "professional_id": "andre",
+      "service_id": "ritual",
+      "service_name": "Corte & barba",
+      "professional_name": "André Ferraz",
+      "starts": 1795698000000,
+      "ends": 1795701600000,
+      "duration": 60,
+      "padding": 0,
+      "price": 13500,
+      "status": "CONFIRMADO",
+      "preferences": [],
+      "created": 1795651891123,
+      "reason": "",
+      "started": null,
+      "finished": null,
+      "client_name": "Mateus Castro"
+    },
+    "history": [
+      {
+        "type": "CONFIRMADO",
+        "at": 1795651891124,
+        "info": {}
+      }
+    ],
+    "media": [],
+    "treatment": null,
+    "profile": {
+      "preference": "",
+      "photo_ok": 0
+    },
+    "safety": null,
+    "template": {
+      "id": "manual-ritual",
+      "service_id": "ritual",
+      "title": "Cuidados após corte & barba",
+      "version": 1,
+      "sections": {
+        "instructions": "Siga a orientação de finalização demonstrada durante a sessão.",
+        "first": "Comece com pouca quantidade de produto e ajuste a aplicação conforme o acabamento desejado.",
+        "avoid": "Evite aplicar produtos que tenham provocado desconforto anteriormente.",
+        "maintenance": "Combine com seu profissional o melhor intervalo para a próxima sessão."
+      },
+      "active": 1,
+      "updated": 1795651891122
+    }
+  }
+}

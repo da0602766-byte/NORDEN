@@ -2,6 +2,12 @@
 
 Plataforma local com agendamento, área profissional, histórico Journey, manuais Care e loja. Interface em português, Node.js e SQLite, sem dependências externas de execução.
 
+## GitHub Pages
+
+[Abrir a demonstração online](https://da0602766-byte.github.io/NORDEN/). A pasta `docs/` contém uma prévia estática com dados fictícios e seleção de perfil no topo. Agendamentos, pedidos, cadastros e outras gravações precisam do servidor e ficam indisponíveis nessa prévia. Nenhum dado do banco local é exportado.
+
+Em **Settings → Pages**, mantenha **Deploy from a branch → main → /docs**. Para atualizar a prévia após alterar a interface, execute `cd norden` e `npm run build:pages`, depois envie `docs/` junto com o código. As rotas da prévia usam `#/` para funcionar em subpastas e após atualizar a página.
+
 ## Executar
 
 Requer Node.js 24 ou superior.

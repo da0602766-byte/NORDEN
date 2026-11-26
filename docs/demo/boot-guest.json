@@ -1,0 +1,279 @@
+{
+  "user": null,
+  "catalog": {
+    "services": [
+      {
+        "id": "corte",
+        "name": "Corte masculino",
+        "category": "Cabelo",
+        "description": "Corte personalizado em tesoura ou máquina, com acabamento e orientação de finalização.",
+        "instructions": "Consulte as opções de acabamento com o profissional.",
+        "price": 8500,
+        "duration": 45,
+        "padding": 0,
+        "active": 1
+      },
+      {
+        "id": "barba",
+        "name": "Barba clássica",
+        "category": "Barba",
+        "description": "Desenho sob medida, toalha quente e finalização para valorizar os contornos.",
+        "instructions": "Informe sensibilidades antes de iniciar.",
+        "price": 6500,
+        "duration": 30,
+        "padding": 0,
+        "active": 1
+      },
+      {
+        "id": "ritual",
+        "name": "Corte & barba",
+        "category": "Combos",
+        "description": "Corte e barba em uma sessão, com acabamento coordenado e revisão das preferências.",
+        "instructions": "Reserve a duração completa para os dois serviços.",
+        "price": 13500,
+        "duration": 60,
+        "padding": 0,
+        "active": 1
+      },
+      {
+        "id": "tratamento",
+        "name": "Tratamento capilar",
+        "category": "Cabelo",
+        "description": "Sessão de lavagem, cuidado cosmético e finalização de acordo com o cabelo.",
+        "instructions": "Converse sobre os produtos utilizados antes da aplicação.",
+        "price": 15500,
+        "duration": 90,
+        "padding": 0,
+        "active": 1
+      }
+    ],
+    "professionals": [
+      {
+        "id": "rafael",
+        "name": "Rafael Almeida",
+        "specialty": "Cortes clássicos e barba",
+        "description": "Une técnica de tesoura e visagismo para criar formas precisas e fáceis de manter.",
+        "image": "./assets/rafael.webp",
+        "active": 1
+      },
+      {
+        "id": "andre",
+        "name": "André Ferraz",
+        "specialty": "Fade e acabamento",
+        "description": "Trabalha transições suaves, textura e cortes contemporâneos pensados para a rotina.",
+        "image": "./assets/andre.webp",
+        "active": 1
+      }
+    ],
+    "products": [
+      {
+        "id": "pomada",
+        "sku": "ND-101",
+        "name": "Pomada Matte",
+        "category": "Cabelo",
+        "brand": "NORDEN",
+        "description": "Fixação flexível e acabamento opaco para valorizar a textura.",
+        "ingredients": "",
+        "usage": "Consulte o rótulo do fabricante e a orientação do profissional.",
+        "warnings": "Produto ilustrativo. Confira os ingredientes do item real antes de usar.",
+        "size": "90 g",
+        "image": "./assets/pomada.webp",
+        "price": 7900,
+        "promo": null,
+        "active": 1,
+        "available": 18
+      },
+      {
+        "id": "oleo",
+        "sku": "ND-102",
+        "name": "Óleo para Barba",
+        "category": "Barba",
+        "brand": "NORDEN",
+        "description": "Finalização com toque leve e aroma amadeirado de referência.",
+        "ingredients": "",
+        "usage": "Consulte o rótulo do fabricante e a orientação do profissional.",
+        "warnings": "Produto ilustrativo. Confira os ingredientes do item real antes de usar.",
+        "size": "30 mL",
+        "image": "./assets/oleo.webp",
+        "price": 6900,
+        "promo": null,
+        "active": 1,
+        "available": 13
+      },
+      {
+        "id": "shampoo",
+        "sku": "ND-103",
+        "name": "Shampoo Diário",
+        "category": "Cabelo",
+        "brand": "NORDEN",
+        "description": "Limpeza para incluir em uma rotina simples de cuidado.",
+        "ingredients": "",
+        "usage": "Consulte o rótulo do fabricante e a orientação do profissional.",
+        "warnings": "Produto ilustrativo. Confira os ingredientes do item real antes de usar.",
+        "size": "250 mL",
+        "image": "./assets/shampoo.webp",
+        "price": 8900,
+        "promo": 7900,
+        "active": 1,
+        "available": 12
+      },
+      {
+        "id": "limpeza",
+        "sku": "ND-104",
+        "name": "Gel de Limpeza",
+        "category": "Pele",
+        "brand": "NORDEN",
+        "description": "Gel facial para remoção de resíduos na rotina diária.",
+        "ingredients": "",
+        "usage": "Consulte o rótulo do fabricante e a orientação do profissional.",
+        "warnings": "Produto ilustrativo. Confira os ingredientes do item real antes de usar.",
+        "size": "100 mL",
+        "image": "./assets/limpeza.webp",
+        "price": 7200,
+        "promo": null,
+        "active": 1,
+        "available": 8
+      },
+      {
+        "id": "pente",
+        "sku": "ND-105",
+        "name": "Pente de Acabamento",
+        "category": "Acessórios",
+        "brand": "NORDEN",
+        "description": "Dentes finos e formato compacto para alinhar a finalização.",
+        "ingredients": "",
+        "usage": "Consulte o rótulo do fabricante e a orientação do profissional.",
+        "warnings": "Produto ilustrativo. Confira os ingredientes do item real antes de usar.",
+        "size": "1 un.",
+        "image": "./assets/pente.webp",
+        "price": 3900,
+        "promo": null,
+        "active": 1,
+        "available": 3
+      },
+      {
+        "id": "kit",
+        "sku": "ND-106",
+        "name": "Kit Essencial",
+        "category": "Acessórios",
+        "brand": "NORDEN",
+        "description": "Seleção demonstrativa de cuidados para presentear.",
+        "ingredients": "",
+        "usage": "Consulte o rótulo do fabricante e a orientação do profissional.",
+        "warnings": "Produto ilustrativo. Confira os ingredientes do item real antes de usar.",
+        "size": "1 kit",
+        "image": "./assets/kit.webp",
+        "price": 16900,
+        "promo": null,
+        "active": 1,
+        "available": 0
+      }
+    ],
+    "compatibility": [
+      {
+        "professional_id": "rafael",
+        "service_id": "corte"
+      },
+      {
+        "professional_id": "andre",
+        "service_id": "corte"
+      },
+      {
+        "professional_id": "rafael",
+        "service_id": "barba"
+      },
+      {
+        "professional_id": "andre",
+        "service_id": "barba"
+      },
+      {
+        "professional_id": "rafael",
+        "service_id": "ritual"
+      },
+      {
+        "professional_id": "andre",
+        "service_id": "ritual"
+      },
+      {
+        "professional_id": "rafael",
+        "service_id": "tratamento"
+      },
+      {
+        "professional_id": "andre",
+        "service_id": "tratamento"
+      }
+    ],
+    "serviceProducts": [
+      {
+        "service_id": "corte",
+        "product_id": "pomada"
+      },
+      {
+        "service_id": "corte",
+        "product_id": "shampoo"
+      },
+      {
+        "service_id": "barba",
+        "product_id": "oleo"
+      },
+      {
+        "service_id": "barba",
+        "product_id": "pente"
+      },
+      {
+        "service_id": "ritual",
+        "product_id": "pomada"
+      },
+      {
+        "service_id": "ritual",
+        "product_id": "oleo"
+      },
+      {
+        "service_id": "tratamento",
+        "product_id": "shampoo"
+      }
+    ],
+    "gallery": [
+      {
+        "id": "textura",
+        "title": "Textura & acabamento",
+        "image": "./assets/atelier.webp",
+        "authorized": 1,
+        "active": 1
+      },
+      {
+        "id": "perfil",
+        "title": "Precisão no corte",
+        "image": "./assets/hero.webp",
+        "authorized": 1,
+        "active": 1
+      }
+    ],
+    "reviews": [],
+    "info": {
+      "headline": "Estilo de verdade.\nCuidado em cada detalhe.",
+      "introduction": "Corte, barba e cuidado masculino com precisão. Agende online e leve sua rotina além da cadeira.",
+      "address": "",
+      "contact": "",
+      "hoursText": "",
+      "faq": [
+        [
+          "Como funciona o agendamento?",
+          "Escolha o serviço, o profissional e um horário disponível. A confirmação aparece na sua conta."
+        ],
+        [
+          "Posso retirar meu pedido?",
+          "Sim. Escolha retirada no checkout para acompanhar quando o pedido ficar pronto."
+        ]
+      ],
+      "pickup": "Combine o local de retirada com a equipe no ambiente de demonstração.",
+      "cancellationHours": 2,
+      "leadMinutes": 30,
+      "bookingDays": 45,
+      "payment": "simulado",
+      "deliveryMax": 12,
+      "reviews": false
+    }
+  },
+  "today": "2026-11-25"
+}
