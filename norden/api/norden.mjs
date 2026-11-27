@@ -8,7 +8,11 @@ export default async function norden(req,res) {
     res.writeHead(503,{'Content-Type':'application/json; charset=utf-8','Cache-Control':'no-store'});
     return res.end(JSON.stringify({error:'O banco de dados do NORDEN ainda não está configurado.'}));
   }
-  if(!handler) handler=createHandler({db:openPostgres(process.env.DATABASE_URL,process.env.NORDEN_SAFETY_KEY),
-    secure:true,production:true,deliver:mailDelivery(process.env)});
+  if(!handler) {
+    let deliver;
+    try { deliver=mailDelivery(process.env); }
+    catch { console.error('Configuração de e-mail NORDEN indisponível'); }
+    handler=createHandler({db:openPostgres(process.env.DATABASE_URL,process.env.NORDEN_SAFETY_KEY),secure:true,production:true,deliver});
+  }
   return handler(req,res);
 }

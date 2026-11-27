@@ -1,5 +1,5 @@
 import http from 'node:http';
-import { mkdirSync,readFileSync } from 'node:fs';
+import { existsSync,mkdirSync,readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 import { fail,local,now,openDatabase,parse } from './core.mjs';
@@ -12,9 +12,9 @@ import { addresses,cart,orderDetails,orders,storeActions } from './store.mjs';
 const actions=Object.freeze(Object.assign(Object.create(null),identityActions,catalogActions,agendaActions,careActions,storeActions));
 const publicRoot=fileURLToPath(new URL('../public',import.meta.url));
 const mimes={'.html':'text/html; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8',
-  '.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.svg':'image/svg+xml','.woff2':'font/woff2'};
+  '.js':'text/javascript; charset=utf-8','.png':'image/png','.webp':'image/webp','.jpg':'image/jpeg','.svg':'image/svg+xml','.woff2':'font/woff2'};
 const secureHeaders={
-  'Content-Security-Policy':"default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
+  'Content-Security-Policy':"default-src 'self'; img-src 'self' data: https:; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'",
   'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','X-Frame-Options':'SAMEORIGIN',
   'Permissions-Policy':'camera=(), microphone=(), geolocation=()'
 };
@@ -44,16 +44,17 @@ async function bodyOf(request,max=40_000) {
     fail('Formulário inválido.');
   }
 }
-async function boot(db,user,view) {
-  const data={user:identity(user),today:local(now()).date};
-  if(view==='entry'&&!user) return {...data,entryOnly:true,catalog:{info:{}}};
+async function boot(db,user,view,production) {
+  const today=local(now()).date;
+  if(view==='entry'&&!user) return {user:null,today,entryOnly:true,catalog:{info:{}}};
+  const settings=production?Promise.resolve(db.settings()).then(value=>({...value,payment:'presencial'})):db.settings();
   if(view==='storefront') {
-    const [catalog,basket]=await Promise.all([publicCatalog(db,false,true),user?.role==='cliente'?cart(db,user):undefined]);
-    return {...data,catalog,cart:basket};
+    const [catalog,basket]=await Promise.all([publicCatalog(db,false,true,settings),user?.role==='cliente'?cart(db,user):undefined]);
+    return {user:user?{role:user.role}:null,today,catalog,cart:basket};
   }
-  if(!user) return {...data,catalog:await publicCatalog(db)};
+  const data={user:identity(user),today};
+  if(!user) return {...data,catalog:await publicCatalog(db,false,false,settings)};
   const full=user.role==='gestor';
-  const settings=db.settings();
   const flow=flowView(db,user);
   const fields={
     catalog:publicCatalog(db,full,false,settings),
@@ -85,7 +86,7 @@ async function boot(db,user,view) {
   const values=await Promise.all(Object.values(fields));
   return {...data,...Object.fromEntries(Object.keys(fields).map((key,index)=>[key,values[index]]))};
 }
-export function createHandler({db,secure=false,outbox,deliver,production=false}={}) {
+export function createHandler({db,secure=false,outbox,deliver,production=false,liveRoot}={}) {
   const attempts=new Map();
   const handle=async(req,res)=>{
     try {
@@ -94,9 +95,13 @@ export function createHandler({db,secure=false,outbox,deliver,production=false}=
       const path=routed?'/api/'+routed:url.pathname;
       url.searchParams.delete('__norden_path');
       const raw=cookie(req.headers.cookie);
-      const user=path.startsWith('/api/')?await session(db,raw):null;
       if(req.method==='POST' && path.startsWith('/api/action/')) {
-        if(!req.headers['x-norden-request'] || !(req.headers['content-type']??'').startsWith('application/json') ||
+        const mime=(req.headers['content-type']??'').split(';',1)[0].trim().toLowerCase();
+        const protocol=secure?'https:':'http:';
+        const expected=URL.parse(protocol+'//'+req.headers.host)?.origin;
+        const {origin}=req.headers;
+        if(req.headers['x-norden-request']!=='1'||mime!=='application/json'||
+          (origin!==undefined&&origin!==expected)||
           ![undefined,'same-origin','none'].includes(req.headers['sec-fetch-site'])) fail('Origem da solicitação inválida.',403);
         const name=path.slice('/api/action/'.length);
         if(!Object.hasOwn(actions,name)) fail('Ação indisponível.',404);
@@ -115,12 +120,14 @@ export function createHandler({db,secure=false,outbox,deliver,production=false}=
           }
         }
         const data=await bodyOf(req,name==='photo'?2_810_000:40_000);
+        const user=await session(db,raw);
         const result=await actions[name](db,data,user,{raw,outbox,deliver,production});
         if (Object.hasOwn(result,'cookie')) return reply(res,result.data,200,undefined,{'Set-Cookie':setSession(result.cookie,secure)});
         return reply(res,result);
       }
       if(req.method==='GET' && path.startsWith('/api/')) {
-        if(path==='/api/boot') return reply(res,{...await boot(db,user,url.searchParams.get('view')),production,accountEmailEnabled:Boolean(outbox||deliver)});
+        const user=await session(db,raw);
+        if(path==='/api/boot') return reply(res,{...await boot(db,user,url.searchParams.get('view'),production),production,accountEmailEnabled:Boolean(outbox||deliver)});
         if(path==='/api/disponibilidade') return reply(res,await availability(db,Object.fromEntries(url.searchParams),user));
         const [, , resource, ref, extra]=path.split('/');
         if(!ref||extra) fail('Registro indisponível.',404);
@@ -133,20 +140,25 @@ export function createHandler({db,secure=false,outbox,deliver,production=false}=
         fail('Recurso indisponível.',404);
       }
       if(!['GET','HEAD'].includes(req.method)) fail('Método indisponível.',405);
-      const file=path==='/'?'index.html':path.slice(1);
-      if(/^(assets\/[\w.-]+|[\w.-]+\.(mjs|css|html))$/.test(file)) {
+      const file=liveRoot&&['/','/loja','/loja/'].includes(path)?'vitrine/live.html':path==='/'?'index.html':path.slice(1);
+      const liveAsset=liveRoot&&/^vitrine\/(?:assets\/(?:images\/)?)?[\w.-]+$/.test(file);
+      if(liveAsset||/^(assets\/[\w.-]+|[\w.-]+\.(mjs|css|html))$/.test(file)) {
         const ext=file.slice(file.lastIndexOf('.'));
         if(mimes[ext]) {
           try {
-            const content=readFileSync(resolve(publicRoot,file));
-            return reply(res,req.method==='HEAD'?null:content,200,mimes[ext],file.startsWith('assets/')?{'Cache-Control':'public, max-age=300'}:{});
+            const content=readFileSync(resolve(liveRoot||publicRoot,file));
+            const cache=/^vitrine\/assets\/[^/]+$/.test(file)?'public, max-age=31536000, immutable':
+              /^(?:vitrine\/)?assets\//.test(file)?'public, max-age=300':null;
+            return reply(res,req.method==='HEAD'?null:content,200,mimes[ext],cache?{'Cache-Control':cache}:{});
           } catch (error) {
             if(error.code!=='ENOENT') throw error;
             fail('Arquivo indisponível.',404);
           }
         }
       }
-      return reply(res,req.method==='HEAD'?null:readFileSync(resolve(publicRoot,'index.html')),200,mimes['.html']);
+      const privatePage=/^\/(usuario|gerencia|app|gestao|conta|login|cadastro|recuperar-senha)(?:\/|$)/.test(path);
+      return reply(res,req.method==='HEAD'?null:readFileSync(resolve(liveRoot||publicRoot,'index.html')),200,mimes['.html'],
+        privatePage?{'X-Robots-Tag':'noindex'}:{});
     } catch (error) {
       if(res.headersSent) return res.end();
       const conflict=error.code==='23P01'||error.message.includes('Agenda indisponível');
@@ -161,11 +173,16 @@ export function createHandler({db,secure=false,outbox,deliver,production=false}=
 export function createServer(options) { return http.createServer(createHandler(options)); }
 if(process.argv[1] && resolve(process.argv[1])===fileURLToPath(import.meta.url)) {
   if(process.env.NODE_ENV==='production') throw new Error('Esta entrega está configurada para avaliação e homologação isoladas.');
+  const livePreview=process.argv.includes('--live-preview');
+  const liveRoot=livePreview?fileURLToPath(new URL('../dist/public',import.meta.url)):undefined;
+  if(liveRoot&&!existsSync(resolve(liveRoot,'vitrine/live.html'))) {
+    throw new Error('Gere os builds de norden e preview antes de iniciar com --live-preview.');
+  }
   const folder=resolve(process.env.NORDEN_DATA || 'data');
   mkdirSync(folder,{recursive:true,mode:0o700});
   const db=openDatabase(resolve(folder,'norden.sqlite'),{secret:process.env.NORDEN_SAFETY_KEY});
-  const host=process.env.HOST || '127.0.0.1';
+  const host=livePreview?'127.0.0.1':process.env.HOST||'127.0.0.1';
   const port=Number(process.env.PORT || 4173);
-  const server=createServer({db,secure:process.env.NORDEN_SECURE_COOKIE==='1',outbox:resolve(folder,'outbox')});
+  const server=createServer({db,secure:process.env.NORDEN_SECURE_COOKIE==='1',outbox:resolve(folder,'outbox'),production:livePreview,liveRoot});
   server.listen(port,host,()=>console.log('NORDEN disponível em http://'+host+':'+port));
 }

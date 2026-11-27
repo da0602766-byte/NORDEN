@@ -42,6 +42,23 @@ npm --prefix preview run typecheck
 npm --prefix preview run build:live
 ```
 
+## Auditoria em branch local — 27/11/2026
+
+O trabalho partiu de `979d592b09a662d0e3462402c52486fd28d521ee` e foi revisado em `auditoria/norden-2026-11-27`. Os testes usaram SQLite com carga fictícia e PostgreSQL descartável via PGlite. A consulta pública em produção encontrou quatro serviços, seis produtos, zero profissionais ativos e e-mail de conta desativado.
+
+| Gate | Escopo validado |
+| --- | --- |
+| Preparação | Node 24, arquivos de lock, builds e suítes da linha de base |
+| Funcional | Agenda, disponibilidade, conta, estoque, sacola, cotação e pedidos |
+| CSS | Temas compartilhados, 13 larguras em retrato e cenário de paisagem |
+| UX | Diálogos, foco, busca sem acentos, navegação e fluxos autenticados |
+| Desempenho | Movimento governado pela preferência do usuário, carregamento, favicon e medições locais |
+| Regressão | Autorização por papel e registro, sessões, concorrência, histórico e ambientes |
+
+A suíte padrão passou com **28 testes** e a suíte de integração sobre PGlite com **26 testes**, aplicando as duas migrações PostgreSQL existentes no banco descartável. Chromium e Firefox foram usados para as telas públicas e os três papéis. Cada motor executou nove percursos de interação. TypeScript, build Node, build da vitrine e build da demonstração passaram. Consulte a [prévia local](README.md#prévia-local-da-vitrine-react-e-dos-portais) para revisar a integração visual.
+
+A validação do e-mail externo, da agenda real, do frete geográfico e de dispositivos físicos ficou pendente. A execução se restringiu à branch local e às bases descartáveis. Dados e configurações de produção foram consultados apenas pelos endpoints públicos.
+
 ## Histórico de verificação local
 
 ### Interface substituída pelo visual do HTML enviado — 25/11/2026

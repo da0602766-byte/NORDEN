@@ -1,15 +1,16 @@
 import {state,esc,brand,icon,img,link,button,eyebrow,form,field,hidden,pageHead,sectionHead,empty,row,notice,
-  publicItems,find,money,cartCount,lines,select,q,banner} from './ui.mjs';
+  publicItems,find,money,cartCount,lines,select,q,banner,themeButton} from './ui.mjs';
 export const accountHome=()=>state.data.user?.role==='cliente'?'/app':state.data.user?'/gestao':'/login';
 const demoRoot='https://da0602766-byte.github.io/NORDEN/';
 const demoHref=staff=>demoRoot+(staff?'?perfil=gestor#/gestao':'?perfil=cliente#/app');
 export function header() {
   return `<header class="site-header"><div class="wrap nav-bar">
-    ${brand()}<button type="button" class="icon-button mobile-menu" data-command="menu" aria-label="Abrir navegação" aria-expanded="false">${icon('menu')}</button>
-    <nav class="public-nav" aria-label="Navegação principal">
+    ${brand()}<button type="button" class="icon-button mobile-menu" data-command="menu" aria-label="Abrir navegação" aria-controls="public-nav" aria-expanded="false">${icon('menu')}</button>
+    <nav id="public-nav" class="public-nav" aria-label="Navegação principal">
       ${link('/servicos','Serviços','nav-link')}${link(state.data.production?'/#linha-do-tempo':'/#experiencia','Experiência','nav-link')}${link('/profissionais','Profissionais','nav-link')}${link('/loja','Loja','nav-link')}
       ${state.data.production?link('/usuario','Área do cliente','nav-link')+link('/gerencia','Gerência','nav-link')+(!state.data.user?link('/usuario/cadastro','Criar conta','nav-link signup-nav'):''):''}
     </nav><div class="nav-actions">
+      ${themeButton()}
       ${link(state.data.production&&!state.data.user?'/usuario/entrar':accountHome(),state.data.user?'Minha área':'Entrar','nav-link account-link','user')}
       <a href="/app/carrinho" class="icon-button cart-icon" aria-label="Carrinho, ${cartCount()} ${cartCount()===1?'item':'itens'}">${icon('bag')}${cartCount()?'<b>'+cartCount()+'</b>':''}</a>
       ${link('/app/agendar','Agendar horário','button primary nav-cta','calendar')}
@@ -144,7 +145,7 @@ export function authView(path,targetOverride='') {
   const isRegister=['/cadastro','/app/cadastro'].includes(path),invite=path==='/conta/convite';
   const reset=path==='/conta/redefinir',recover=path==='/recuperar-senha',verify=path==='/conta/verificar';
   let title=staff?'Acesso à gerência':production?'Acesse sua conta':'Bem-vindo ao NORDEN.',sub=staff?'Entre com a conta autorizada pela equipe.':'Acesse seus agendamentos, cuidados e pedidos.',code='login',fields='';
-  const mail=field('E-mail','email','','email','autocomplete="email" required maxlength="240"');
+  const mail=field('E-mail','email','','email',`autocomplete="${isRegister||invite||recover?'email':'username'}" required maxlength="240"`);
   const secret=field(reset?'Nova senha':'Senha','password','','password',`autocomplete="${isRegister||invite||reset?'new-password':'current-password'}" ${isRegister||invite||reset?'minlength="10"':''} required maxlength="128"`);
   const confirm=field('Confirme a senha','confirm','','password','autocomplete="new-password" minlength="10" required maxlength="128"');
   if(isRegister||invite) {
@@ -165,9 +166,10 @@ export function authView(path,targetOverride='') {
   return `<div class="auth-layout"><aside class="auth-image">${img('/assets/norden-auth.jpg','Logotipo oficial do NORDEN','', 'decoding="async"')}</aside>
     <div class="auth-body">${eyebrow('CONTA NORDEN')}<h1>${title}</h1><p>${sub}</p>
     ${recover&&production&&!state.data.accountEmailEnabled?'':form(code,hidden('target',target)+hidden('token',token)+hidden('area',production&&code==='login'?(staff?'gerencia':'cliente'):'')+fields+button(cta))}
-    <div class="actions auth-links">${code==='login'?(!production||state.data.accountEmailEnabled?link('/recuperar-senha','Esqueci minha senha','text-button'):'')+(!staff?link((production?'/usuario/cadastro':'/cadastro')+(target?'?voltar='+encodeURIComponent(target):''),'Criar conta','text-button'):''):
+    <div class="actions auth-links">${code==='login'?(link('/recuperar-senha','Esqueci minha senha','text-button'))+(!staff?link((production?'/usuario/cadastro':'/cadastro')+(target?'?voltar='+encodeURIComponent(target):''),'Criar conta','text-button'):''):
       link((production?'/usuario/entrar':'/login')+(target?'?voltar='+encodeURIComponent(target):''),'Ir para login','text-button')}</div>
-    ${production&&code==='login'?`<aside class="account-intro"><span>${staff?'Veja como a gerência funciona com Rafael Almeida.':'Conheça sua área com o exemplo de Lucas Martins.'}</span>${link(demoHref(staff),'Ver demonstração','text-button')}</aside>`:''}
+    ${production&&code==='login'?`<aside class="account-intro"><span>${staff?'Conheça o painel de gestão na demonstração.':'Explore a área do cliente na demonstração.'}</span>${link(demoHref(staff),'Ver demonstração','text-button')}</aside>`:''}
+    ${recover&&!state.data.accountEmailEnabled?link('/contato','Falar com a equipe','text-button'):''}
     ${isRegister?notice('Consulte a política de privacidade para saber como os dados são usados.')+link('/privacidade','Política de privacidade','text-button'):''}
     </div></div>`;
 }
@@ -175,7 +177,7 @@ export function publicPage(parts) {
   const [page,ref]=parts;
   if(page==='servicos') return servicesView(ref);
   if(page==='loja') return shop(ref);
-  if(page==='profissionais') return `${pageHead('Profissionais','Equipe e imagens fictícias para demonstração. Consulte os horários por profissional.')}
+  if(page==='profissionais') return `${pageHead('Profissionais',state.data.production?'Consulte os horários por profissional.':'Equipe fictícia da demonstração.')}
     <div class="pro-grid">${lines(publicList('professionals'),professionalCard,empty('Equipe em preparação'))}</div>`;
   if(page==='galeria') return `${pageHead('Galeria','Imagens ilustrativas de cortes e acabamentos.')}
     <div class="gallery-grid">${lines(state.data.catalog.gallery.filter(x=>x.authorized&&x.active),galleryItem,empty('Sem imagens disponíveis'))}</div>`;

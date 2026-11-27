@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { Modal } from './Modal';
 import { Briefcase, LogOut, User, X } from 'lucide-react';
 import { useNorden } from '../context/NordenContext';
 import { NordenLogo } from './NordenLogo';
@@ -22,33 +22,12 @@ const profiles = [
 
 export function AuthModal() {
   const { isAuthModalOpen, setAuthModalOpen, role, switchRole } = useNorden();
-  const dialog = useRef<HTMLDialogElement>(null);
-
-  useEffect(() => {
-    const element = dialog.current;
-    if (!element) return;
-    if (!isAuthModalOpen) {
-      element.close();
-      return;
-    }
-
-    element.showModal();
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = previousOverflow;
-    };
-  }, [isAuthModalOpen]);
-
   return (
-    <dialog
-      ref={dialog}
+    <Modal
+      open={isAuthModalOpen}
+      onDismiss={() => setAuthModalOpen(false)}
       aria-labelledby="auth-modal-title"
       aria-describedby="auth-modal-description"
-      onClose={() => setAuthModalOpen(false)}
-      onClick={(event) => {
-        if (event.target === event.currentTarget) setAuthModalOpen(false);
-      }}
       className="fixed inset-x-0 bottom-0 top-auto m-0 w-full max-w-none max-h-[92dvh] overflow-auto rounded-t-2xl border border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xl backdrop:bg-black/70 backdrop:backdrop-blur-sm sm:inset-0 sm:m-auto sm:max-w-xl sm:rounded-2xl"
     >
       <div className="p-5 sm:p-7">
@@ -56,6 +35,7 @@ export function AuthModal() {
           <NordenLogo variant="markOnly" />
           <button
             type="button"
+            data-initial-focus
             onClick={() => setAuthModalOpen(false)}
             aria-label="Fechar janela de acesso"
             className="grid min-h-11 min-w-11 cursor-pointer place-items-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--bg-surface-alt)]"
@@ -94,6 +74,6 @@ export function AuthModal() {
           </button>
         )}
       </div>
-    </dialog>
+    </Modal>
   );
 }

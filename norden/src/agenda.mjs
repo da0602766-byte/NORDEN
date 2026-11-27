@@ -86,6 +86,10 @@ async function createBooking(db,body,user,manual) {
   return await db.tx(async ()=>{
     const item=await selectionFor(db,body.serviceId,professionalId);
     if (integer(body.price,'preço')!==item.price) fail('O valor do serviço mudou. Confira o novo preço.',409);
+    if ((body.duration!==undefined&&integer(body.duration,'duração')!==item.duration)||
+        (body.padding!==undefined&&integer(body.padding,'intervalo')!==item.padding)) {
+      fail('A duração ou o intervalo do serviço mudou. Consulte os horários novamente.',409);
+    }
     const starts=dateTime(body.date,body.clock);
     const ends=starts+(item.duration+item.padding)*minute;
     if (!await validTime(db,{professionalId,clientId,starts,ends,settings:await db.settings()})) fail('Este horário acabou de ficar indisponível. Escolha outro.',409);

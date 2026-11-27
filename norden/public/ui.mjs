@@ -24,6 +24,9 @@ export const img=(source,alt='',klass='',attrs='loading="lazy"')=>source
   ? `<img src="${esc(source)}" alt="${esc(alt)}" class="${klass}" ${attrs}>`
   : `<div class="image-empty ${klass}" aria-hidden="true">N</div>`;
 const paths={
+  sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19M5 19l1.5-1.5m11-11L19 5"/>',
+  moon:'<path d="M20.8 15A9 9 0 0 1 9 3.2 9 9 0 1 0 20.8 15Z"/>',
+
   calendar:'<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18m5 4h.01M12 14h.01M16 14h.01M8 17h.01"/>',
   bag:'<path d="M5 8h14l1 13H4L5 8Z"/><path d="M9 10V6a3 3 0 0 1 6 0v4"/>',
   user:'<circle cx="12" cy="8" r="3.5"/><path d="M4 21v-2a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v2"/>',
@@ -43,9 +46,14 @@ const paths={
   grid:'<rect x="4" y="4" width="6" height="6"/><rect x="14" y="4" width="6" height="6"/><rect x="4" y="14" width="6" height="6"/><rect x="14" y="14" width="6" height="6"/>'
 };
 export const icon=(name,size=20)=>`<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.55" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name]??''}</svg>`;
+export function themeButton() {
+  const dark=state.dark===true;
+  const label=dark?'Ativar modo claro':'Ativar modo escuro';
+  return `<button type="button" class="icon-button theme-switch" title="${label}" aria-label="${label}" data-command="theme">${icon(dark?'sun':'moon',18)}</button>`;
+}
 export const link=(href,text,klass='button',glyph='')=>`<a class="${klass}" href="${esc(href)}">${glyph?icon(glyph):''}${esc(text)}</a>`;
 export const button=(text,klass='button primary',attrs='')=>`<button class="${klass}" ${attrs}>${esc(text)}</button>`;
-export const brand=() => `<a class="brand" href="/" aria-label="NORDEN, página inicial">${img('/assets/norden-emblem.svg','', 'brand-image','width="48" height="60"')}<span><span class="wordmark">NORDEN</span><span class="brand-sub">SALÃO MASCULINO</span></span></a>`;
+export const brand=() => `<a class="brand" href="/">${img('/assets/norden-emblem.svg','', 'brand-image','width="48" height="60"')}<span><span class="wordmark">NORDEN</span> <span class="brand-sub">SALÃO MASCULINO</span></span></a>`;
 export const empty=(title,body='',cta='')=>`<div class="empty"><h3>${esc(title)}</h3>${body?`<p>${esc(body)}</p>`:''}${cta}</div>`;
 export const eyebrow=text=>`<p class="eyebrow">${esc(text)}</p>`;
 export const pageHead=(title,desc='',actions='',over='')=>`<header class="page-head">${over?eyebrow(over):''}<div class="page-head-line"><div><h1>${esc(title)}</h1>${desc?`<p>${esc(desc)}</p>`:''}</div>${actions?`<div class="actions">${actions}</div>`:''}</div></header>`;
@@ -78,7 +86,7 @@ export function guestCart() {
   } catch { return {}; }
 }
 export function saveCart(value) {
-  try { localStorage.setItem('norden-cart',JSON.stringify(value)); } catch { /* storage can be disabled */ }
+  try { localStorage.setItem('norden-cart',JSON.stringify(value)); return true; } catch { return false; }
 }
 export function cartCount() {
   return state.data.user?.role==='cliente' ? state.data.cart.items.reduce((sum,x)=>sum+x.quantity,0) :
@@ -86,8 +94,14 @@ export function cartCount() {
 }
 export function lines(list,fn,fallback='') { return list.length ? list.map(fn).join('') : fallback; }
 export async function api(path,body) {
-  const response=await fetch('/api/'+path,body===undefined?{}:{method:'POST',headers:{'Content-Type':'application/json','X-Norden-Request':'1'},body:JSON.stringify(body)});
-  const data=await response.json();
+  const options={signal:AbortSignal.timeout(25000)};
+  if(body!==undefined) Object.assign(options,{method:'POST',headers:{'Content-Type':'application/json','X-Norden-Request':'1'},body:JSON.stringify(body)});
+  let response;
+  try { response=await fetch('/api/'+path,options); }
+  catch { throw new Error('Não foi possível conectar ao NORDEN. Confira sua conexão e tente novamente.'); }
+  let data;
+  try { data=await response.json(); }
+  catch { throw Object.assign(new Error('A resposta do NORDEN está indisponível.'),{status:response.status}); }
   if(!response.ok) throw Object.assign(new Error(data.error||'Ocorreu uma falha.'),{status:response.status});
   return data;
 }

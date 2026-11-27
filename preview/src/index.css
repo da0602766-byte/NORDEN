@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../../norden/public/assets/norden-theme.css";
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -15,57 +16,16 @@
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
-/* Light Mode (Soft Stone & Grafite Editorial) */
-:root {
-  color-scheme: light;
-  --bg-canvas: #F5F2EC;
-  --bg-band: #ECE7DF;
-  --bg-surface: #FFFFFF;
-  --bg-surface-alt: #F1ECE4;
-  --bg-input: #FAF8F5;
-  --bg-header: rgba(245, 242, 236, 0.92);
-  --bg-footer: #EAE4DC;
-  --text-primary: #141417;
-  --text-secondary: #373431;
-  --text-muted: #5F564D;
-  --accent: #8E6B47;
-  --accent-hover: #765636;
-  --accent-fg: #FFFFFF;
-  --border-subtle: rgba(95, 86, 77, 0.16);
-  --border-strong: rgba(95, 86, 77, 0.30);
-  --tab-active-bg: #1F1F23;
-  --tab-active-fg: #F5F2EC;
-  --status-warn: #B45309;
-  --status-danger: #B91C1C;
-  --shadow-card: 0 10px 28px -12px rgba(20, 20, 23, 0.12);
-}
-
-/* Dark Mode (Grafite Premium & Ônix Black) */
-.dark {
-  color-scheme: dark;
-  --bg-canvas: #0B0B0D;
-  --bg-band: #111114;
-  --bg-surface: #1F1F23;
-  --bg-surface-alt: #16161A;
-  --bg-input: #0B0B0D;
-  --bg-header: rgba(11, 11, 13, 0.92);
-  --bg-footer: #08080A;
-  --text-primary: #E7E2DB;
-  --text-secondary: #CFC7BC;
-  --text-muted: #9C9288;
-  --accent: #B58E65;
-  --accent-hover: #C6A077;
-  --accent-fg: #0B0B0D;
-  --border-subtle: rgba(140, 129, 118, 0.20);
-  --border-strong: rgba(140, 129, 118, 0.36);
-  --tab-active-bg: #E7E2DB;
-  --tab-active-fg: #0B0B0D;
-  --status-warn: #FBBF24;
-  --status-danger: #F87171;
-  --shadow-card: 0 16px 36px -14px rgba(0, 0, 0, 0.65);
-}
-
 @layer base {
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+
+  html:has(dialog[open]) {
+    overflow: hidden;
+  }
+
   html {
     background-color: var(--bg-canvas);
     color: var(--text-primary);
@@ -98,186 +58,18 @@
   }
 }
 
-/* Infinite editorial cinema & GIF-style compositor animations */
-@keyframes norden-kenburns {
-  0% {
-    transform: scale(1) translate3d(0%, 0%, 0);
-  }
-  50% {
-    transform: scale(1.1) translate3d(-1.5%, -1%, 0);
-  }
-  100% {
-    transform: scale(1) translate3d(0%, 0%, 0);
-  }
-}
-
-@keyframes norden-marquee {
-  0% {
-    transform: translate3d(0, 0, 0);
-  }
-  100% {
-    transform: translate3d(-50%, 0, 0);
-  }
-}
-
-@keyframes norden-marquee-reverse {
-  0% {
-    transform: translate3d(-50%, 0, 0);
-  }
-  100% {
-    transform: translate3d(0, 0, 0);
-  }
-}
-
-@keyframes norden-float {
-  0%, 100% {
-    transform: translate3d(0, 0, 0);
-  }
-  50% {
-    transform: translate3d(0, -6px, 0);
-  }
-}
-
 @keyframes norden-sheen {
-  0% {
-    transform: translateX(-120%);
-  }
-  100% {
-    transform: translateX(220%);
-  }
+  from { transform: translateX(-120%); }
+  to { transform: translateX(220%); }
 }
 
-/* Living cinemagraph idle breathing (subtle continuous GIF-like depth) */
-@keyframes norden-cinemagraph-idle {
-  0% {
-    transform: scale(1.01) translate3d(0%, 0%, 0);
-  }
-  33% {
-    transform: scale(1.055) translate3d(-1.2%, -0.8%, 0);
-  }
-  66% {
-    transform: scale(1.035) translate3d(1%, -0.5%, 0);
-  }
-  100% {
-    transform: scale(1.01) translate3d(0%, 0%, 0);
-  }
-}
-
-/* Diagonal warm brushed-bronze studio rim-light sweep */
-@keyframes norden-light-sweep {
-  0% {
-    transform: translate3d(-150%, 0, 0) skewX(-22deg);
-    opacity: 0;
-  }
-  20% {
-    opacity: 0.7;
-  }
-  50% {
-    opacity: 0.9;
-  }
-  80% {
-    opacity: 0.4;
-  }
-  100% {
-    transform: translate3d(260%, 0, 0) skewX(-22deg);
-    opacity: 0;
-  }
-}
-
-/* Organic rising warm steam / atmospheric haze for barbershop rituals */
-@keyframes norden-steam-drift {
-  0% {
-    transform: translate3d(-4%, 18%, 0) scale(0.95);
-    opacity: 0;
-  }
-  28% {
-    opacity: 0.34;
-  }
-  65% {
-    opacity: 0.22;
-  }
-  100% {
-    transform: translate3d(5%, -22%, 0) scale(1.18);
-    opacity: 0;
-  }
-}
-
-/* Ambient bronze studio spotlight pulse behind cards on hover */
-@keyframes norden-orbit-glow {
-  0%, 100% {
-    transform: scale(0.96) translate3d(0, 0, 0);
-    opacity: 0.22;
-  }
-  50% {
-    transform: scale(1.1) translate3d(2%, -2%, 0);
-    opacity: 0.48;
-  }
-}
-
-.animate-kenburns {
-  animation: norden-kenburns 18s ease-in-out infinite;
-  will-change: transform;
-}
-
-.animate-marquee {
-  animation: norden-marquee 34s linear infinite;
-  will-change: transform;
-}
-
-.animate-marquee-slow {
-  animation: norden-marquee 48s linear infinite;
-  will-change: transform;
-}
-
-.animate-marquee-reverse {
-  animation: norden-marquee-reverse 40s linear infinite;
-  will-change: transform;
-}
-
-.marquee-group:hover .animate-marquee,
-.marquee-group:hover .animate-marquee-slow,
-.marquee-group:hover .animate-marquee-reverse {
-  animation-play-state: paused;
-}
-
-.animate-float-subtle {
-  animation: norden-float 5.5s ease-in-out infinite;
-  will-change: transform;
-}
-
-.animate-sheen {
-  animation: norden-sheen 4.5s ease-in-out infinite;
-  will-change: transform;
-}
-
-.animate-cinemagraph {
-  animation: norden-cinemagraph-idle 13s ease-in-out infinite;
-  will-change: transform;
+.animate-sheen { transform: translateX(-120%); }
+button:is(:hover, :focus-visible) > .animate-sheen {
+  animation: norden-sheen 0.35s ease-out;
 }
 
 .group:hover .cinemagraph-media {
-  transform: scale(1.09) translate3d(0, -1%, 0);
-  filter: contrast(1.05) brightness(1.04);
-}
-
-.animate-light-sweep {
-  animation: norden-light-sweep 5.6s cubic-bezier(0.22, 1, 0.36, 1) infinite;
-  will-change: transform, opacity;
-}
-
-.animate-steam-drift {
-  animation: norden-steam-drift 7.5s ease-in-out infinite;
-  will-change: transform, opacity;
-}
-
-.animate-steam-drift-delayed {
-  animation: norden-steam-drift 9.5s ease-in-out 3.2s infinite;
-  will-change: transform, opacity;
-}
-
-.animate-orbit-glow {
-  animation: norden-orbit-glow 6s ease-in-out infinite;
-  will-change: transform, opacity;
+  transform: scale(1.04);
 }
 
 @media (prefers-reduced-motion: reduce) {

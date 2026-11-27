@@ -3,9 +3,7 @@
 .pages-demo-bar strong,.pages-demo-bar span {display:block}.pages-demo-bar strong {font-size:12px;letter-spacing:.1em;color:#d0b18c}.pages-demo-bar nav {display:flex;gap:.4rem;flex-wrap:wrap}
 .pages-demo-bar button {font:inherit;color:#e7e2db;border:1px solid #6e5339;border-radius:7px;background:#151518;padding:.4rem .8rem;cursor:pointer}.pages-demo-bar button[aria-pressed=true] {background:#c4a582;color:#0b0b0d}
 :root {
-  color-scheme:dark; --paper:#0b0b0d; --panel:#1a1a1e; --ink:#e7e2db;
-  --muted:#b5aaa0; --edge:#393438; --sand:#c4a582; --accent-ink:#d0b18c;
-  --serif:"Segoe UI",Arial,sans-serif; --wrap:min(100% - clamp(2rem,8vw,8rem),1240px);
+  --wrap:min(100% - clamp(2rem,8vw,8rem),1240px);
 }
 body {background:var(--paper)}
 h1,h2,h3,h4 {letter-spacing:-.035em}
@@ -16,10 +14,10 @@ h2 {font-size:clamp(1.5rem,2.5vw,2.4rem)}
 .brand-sub {color:var(--sand)}
 .button,.utility,.panel,.metrics a,.option,.choice-list {border-radius:12px}
 .button {font-size:.875rem;min-height:2.8rem;letter-spacing:.015em}
-.button.primary {background:#b89168;border-color:#b89168;color:#0b0b0d}
-.button.primary:hover {background:#d0b18c;box-shadow:0 6px 24px #8e6b4733}
+.button.primary {background:var(--accent);border-color:var(--accent);color:var(--accent-fg)}
+.button.primary:hover {background:var(--accent-hover);border-color:var(--accent-hover)}
 .button.outline:hover,.utility:hover {background:#302820;color:var(--ink)}
-.field input,.field select,.field textarea,.invite-link {border-radius:9px;background:#141417}
+.field input,.field select,.field textarea,.invite-link {min-width:0;border-radius:var(--control-radius);background:var(--bg-input)}
 .button:focus-visible,.product-card:focus-within {outline:2px solid var(--sand);outline-offset:4px}
 .light-block,.store-band,.contact-band,.ecosystem {background:#151518;color:var(--ink)}
 .form-error,.banner {background:#302820;border-radius:0 8px 8px 0}
@@ -37,7 +35,7 @@ h2 {font-size:clamp(1.5rem,2.5vw,2.4rem)}
 .page-head {padding-bottom:1.3rem;border-bottom:1px solid var(--edge)}
 .page-head .eyebrow {font-size:.8rem}
 .workspace-content h1 {font-size:clamp(2rem,3.2vw,3rem)}
-.workspace-header {background:#111114}
+.workspace-header {background:var(--bg-header)}
 .workspace-content,.public-content {animation:page-reveal .32s ease-out both}
 .norden-hero {overflow:hidden;background:radial-gradient(ellipse at 65% 15%,#8e6b471c,transparent 65%),#0b0b0d;border-bottom:1px solid var(--edge)}
 .norden-hero-grid {display:grid;grid-template-columns:1.1fr 1fr;gap:5rem;align-items:center;padding-block:5rem 6rem}
@@ -142,39 +140,52 @@ h2 {font-size:clamp(1.5rem,2.5vw,2.4rem)}
 .account-intro {display:flex; flex-wrap:wrap; align-items:center; gap:.25rem .7rem; margin-top:.85rem; padding:.8rem 0; border-top:1px solid var(--edge); color:var(--muted); font-size:.875rem;}
 .auth-image {overflow:hidden; position:relative; min-height:22rem;}
 .auth-image img {position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:cover;}
-@media(max-width:720px) {.auth-image {min-height:0; aspect-ratio:2.4;}.auth-image img {max-height:none;width:100%;}}
-
-.portal-light {
-  color-scheme:light;
-  --paper:#f5f2ec; --panel:#fff; --ink:#141417; --muted:#5f564d;
-  --edge:#ddd6cc; --sand:#8e6b47; --accent-ink:#765636;
-  --sans:"DM Sans","Segoe UI",sans-serif; --serif:"Outfit","Segoe UI",sans-serif;
+@media(max-width:720px) {
+  .auth-layout {grid-template-columns:minmax(0,1fr);min-height:0}
+  .auth-image {display:none}
+  .auth-body {padding:1.35rem 0 1.65rem}
 }
-.portal-light h1,.portal-light h2,.portal-light h3,.portal-light h4 {font-family:var(--serif)}
-.portal-light .site-header,.portal-light .workspace-header,.portal-light .mobile-tabs {
+
+:root:not(.dark) .site-header,:root:not(.dark) .workspace-header,:root:not(.dark) .mobile-tabs {
   background:#f5f2ecf5;color:var(--ink);border-color:var(--edge);
 }
-.portal-light .site-header .nav-bar {min-height:4rem}
-.portal-light .site-header .icon-button,.portal-light .site-header .nav-link {color:var(--ink)}
-.portal-light .sidebar,.portal-light .site-footer {background:#ece7df;color:var(--ink)}
-.portal-light .site-footer .nav-link,.portal-light .sidebar .side-link,.portal-light .mobile-tabs .side-link {color:var(--ink)}
-.portal-light .brand-sub {display:none}
-.portal-light .brand-image {width:1.8rem;height:2.4rem}
-.portal-light .brand .wordmark {font-family:var(--serif);font-size:1.15rem}
-.portal-light .button.primary {background:#8e6b47;border-color:#8e6b47;color:#fff}
-.portal-light .button.primary:hover {background:#765636;border-color:#765636}
-.portal-light .button.outline:hover,.portal-light .utility:hover,
-.portal-light .option:has(input:checked),.portal-light .slot:has(input:checked),.portal-light .metrics a:hover {background:#ece7df;color:var(--ink)}
-.portal-light .field input,.portal-light .field select,.portal-light .field textarea,.portal-light .invite-link {background:#faf8f5;color:var(--ink)}
-.portal-light .panel,.portal-light .journey-session,.portal-light .product-card {background:var(--panel);box-shadow:0 10px 28px -12px #14141720}
-.portal-light .journey-overview,.portal-light .session-products>section,.portal-light .mini-product {background:#f1ece4}
-.portal-light .session-summary {color:var(--ink)}
-.portal-light .banner,.portal-light .form-error {background:#efe4d7;color:var(--ink)}
-.portal-light .banner.error,.portal-light .form-error {background:#fbe7e4;color:#801e17}
-.portal-light .auth-layout {
+:root:not(.dark) .site-header .nav-bar {min-height:4rem}
+:root:not(.dark) .site-header .icon-button,:root:not(.dark) .site-header .nav-link {color:var(--ink)}
+:root:not(.dark) .sidebar,:root:not(.dark) .site-footer {background:#ece7df;color:var(--ink)}
+:root:not(.dark) .site-footer .nav-link,:root:not(.dark) .sidebar .side-link,:root:not(.dark) .mobile-tabs .side-link {color:var(--ink)}
+:root:not(.dark) .brand-sub {display:none}
+:root:not(.dark) .brand-image {width:1.8rem;height:2.4rem}
+:root:not(.dark) .brand .wordmark {font-family:var(--serif);font-size:1.15rem}
+:root:not(.dark) .button.outline:hover,:root:not(.dark) .utility:hover,
+:root:not(.dark) .option:has(input:checked),:root:not(.dark) .slot:has(input:checked),:root:not(.dark) .metrics a:hover {background:#ece7df;color:var(--ink)}
+:root:not(.dark) .panel,:root:not(.dark) .journey-session,:root:not(.dark) .product-card {background:var(--panel);box-shadow:0 10px 28px -12px #14141720}
+:root:not(.dark) .journey-overview,:root:not(.dark) .session-products>section,:root:not(.dark) .mini-product {background:#f1ece4}
+:root:not(.dark) .session-summary {color:var(--ink)}
+:root:not(.dark) .banner,:root:not(.dark) .form-error {background:#efe4d7;color:var(--ink)}
+:root:not(.dark) .banner.error,:root:not(.dark) .form-error {background:#fbe7e4;color:#801e17}
+.auth-layout {
   width:var(--wrap);margin:clamp(1rem,4vw,3rem) auto;
   border:1px solid var(--edge);border-radius:1rem;overflow:hidden;background:var(--panel);
 }
-@media(max-width:960px) {
-  .portal-light .public-nav {background:var(--panel);color:var(--ink);border-color:var(--edge)}
+@media(max-width:1100px) {
+  :root:not(.dark) .public-nav {background:var(--panel);color:var(--ink);border-color:var(--edge)}
+}
+
+.site-header,.workspace-header {--header-size:4.3rem}
+.workspace-content,.auth-body,.nav-bar,.filters > *, .booking-layout > * {min-width:0}
+.line-end,.status,.product-title {overflow-wrap:anywhere}
+:root:not(.dark) .sidebar .side-link:is(:hover,.active),:root:not(.dark) .mobile-tabs .side-link:is(:hover,.active) {background:var(--bg-surface-alt)}
+:root:not(.dark) :is(.light-block,.store-band,.contact-band,.ecosystem) {background:var(--bg-band)}
+.user-initial {color:var(--accent);background:var(--bg-surface-alt);flex:none}
+@media(max-width:850px) {
+  .workspace-header {height:var(--header-size)}
+  .workspace .sidebar {top:4.3rem}
+  .workspace-name {display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .workspace-ident {min-width:0}
+}
+@media(max-width:430px) {
+  .line-end {flex-wrap:wrap}
+  .workspace-actions .demo-label {display:none}
+  .workspace-actions .icon-button {width:2.35rem}
+  .workspace .side-link {overflow-wrap:anywhere}
 }

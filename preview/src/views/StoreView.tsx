@@ -1,12 +1,19 @@
-import React, { useMemo, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { motion } from 'motion/react';
+import { Modal } from '../components/Modal';
 import { Search, Plus, Minus, X, ArrowRight, ShoppingBag } from 'lucide-react';
 import { useNorden } from '../context/NordenContext';
 import { SafeImage } from '../components/SafeImage';
-import { formatBRL, getAvailableStock } from '../utils/format';
-import type { Product } from '../types';
+import { formatBRL, storefrontStock } from '../utils/format';
+import type { StorefrontProduct } from '../types';
 
-type StoreProps = Pick<ReturnType<typeof useNorden>, 'products' | 'services' | 'setCartOpen' | 'cartCount' | 'startBookingWithService'> & {
+const normalizeSearch = (text: string) => text.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase();
+
+type StoreProps = Pick<ReturnType<typeof useNorden>, 'services' | 'setCartOpen' | 'cartCount' | 'startBookingWithService'> & {
+  products: StorefrontProduct[];
+  addingId?: string | null;
+  cartNotice?: string;
+  keepFiltersInUrl?: boolean;
   addToCart: (id: string, quantity?: number) => boolean | Promise<boolean>;
   deliverySettings?: ReturnType<typeof useNorden>['deliverySettings'];
   loading?: boolean;
@@ -19,6 +26,9 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
     products,
     services,
     addToCart,
+    addingId,
+    cartNotice,
+    keepFiltersInUrl,
     setCartOpen,
     cartCount,
     startBookingWithService,
@@ -26,23 +36,34 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
     loading,
   } = props;
 
-  const [search, setSearch] = useState('');
-  const [category, setCategory] = useState('Todos');
-  const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const initialFilters = new URLSearchParams(keepFiltersInUrl ? location.search : '');
+  const [search, setSearch] = useState(() => initialFilters.get('busca') ?? '');
+  const [category, setCategory] = useState(() => initialFilters.get('categoria') || 'Todos');
+  const [sortBy, setSortBy] = useState(() => {
+    const order = initialFilters.get('ordem');
+    return order === 'price-asc' || order === 'price-desc' ? order : 'featured';
+  });
+  useEffect(() => {
+    if (!keepFiltersInUrl) return;
+    const url = new URL(location.href);
+    for (const [key, value] of [['busca', search.trim()], ['categoria', category === 'Todos' ? '' : category],
+      ['ordem', sortBy === 'featured' ? '' : sortBy]]) {
+      if (value) url.searchParams.set(key, value);
+      else url.searchParams.delete(key);
+    }
+    if (url.href !== location.href) history.replaceState(history.state, '', url);
+  }, [search, category, sortBy, keepFiltersInUrl]);
+  const [selectedProduct, setSelectedProduct] = useState<StorefrontProduct | null>(null);
   const [modalQty, setModalQty] = useState(1);
 
   const filteredProducts = useMemo(() => {
-    const q = search.trim().toLowerCase();
+    const q = normalizeSearch(search.trim());
     const list = products.filter((p) => {
       if (!p.active) return false;
       if (category !== 'Todos' && p.category !== category) return false;
       if (q) {
-        return (
-          p.name.toLowerCase().includes(q) ||
-          p.shortDescription.toLowerCase().includes(q) ||
-          p.sku.toLowerCase().includes(q)
-        );
+        return [p.name, p.shortDescription, p.sku, p.brand, p.category]
+          .some((text) => normalizeSearch(text).includes(q));
       }
       return true;
     });
@@ -56,7 +77,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
     });
   }, [products, search, category, sortBy]);
 
-  const openDetail = (product: Product) => {
+  const openDetail = (product: StorefrontProduct) => {
     setSelectedProduct(product);
     setModalQty(1);
   };
@@ -89,12 +110,13 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
         </button>
       </div>
 
-      {/* Infinite GIF-like Living Storefront Showcase Strip */}
-      <div className="mt-6 mb-2 overflow-hidden marquee-group border border-[var(--border-subtle)] py-4 bg-[var(--bg-surface-alt)] rounded-xl">
-        <div className="flex animate-marquee-slow whitespace-nowrap">
-          {[...products, ...products].map((item, idx) => (
+      {/* Compact, manually scrollable product shortcuts */}
+      {products.some((item) => item.active) && (
+      <div className="mt-6 mb-2 overflow-x-auto rounded-xl border border-[var(--border-subtle)] bg-[var(--bg-surface-alt)] py-3" role="region" aria-label="Atalhos de produtos">
+        <div className="flex w-max">
+          {products.filter((item) => item.active).map((item) => (
             <button
-              key={`${item.id}-ribbon-${idx}`}
+              key={item.id}
               type="button"
               onClick={() => openDetail(item)}
               className="group/ribbon inline-flex items-center gap-3.5 px-5 shrink-0 text-left cursor-pointer border-r border-[var(--border-subtle)] last:border-r-0"
@@ -102,8 +124,8 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
               <div className="w-11 h-11 rounded-md overflow-hidden bg-[var(--bg-surface)] shrink-0 relative">
                 <SafeImage
                   src={item.image}
-                  alt={item.name}
-                  className="w-full h-full object-cover animate-cinemagraph"
+                  alt=""
+                  className="w-full h-full object-cover"
                 />
               </div>
               <div>
@@ -119,6 +141,8 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
         </div>
       </div>
 
+      )}
+
       {/* Filter & Search Toolbar */}
       <div className="py-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
@@ -127,6 +151,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
               key={cat}
               type="button"
               onClick={() => setCategory(cat)}
+              aria-pressed={category === cat}
               className={`min-h-[38px] px-3.5 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                 category === cat
                   ? 'bg-[var(--tab-active-bg)] text-[var(--tab-active-fg)]'
@@ -144,6 +169,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
             <input
               type="search"
               value={search}
+            maxLength={100}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Buscar produto ou SKU..."
               aria-label="Buscar produtos"
@@ -187,14 +213,13 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-7 mt-2">
           {filteredProducts.map((product, idx) => {
-            const available = getAvailableStock(product.physicalStock, product.reservedStock);
-            const isLowStock = available > 0 && available <= product.minStockAlert;
+            const available = storefrontStock(product);
+            const isLowStock = available > 0 && available <= ('minStockAlert' in product ? product.minStockAlert : 0);
             const activePrice = product.promoPriceCents ?? product.priceCents;
 
             return (
               <motion.article
                 key={product.id}
-                layout
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.28, delay: idx * 0.04 }}
@@ -209,12 +234,12 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                 <button
                   type="button"
                   onClick={() => openDetail(product)}
+                  aria-label={`Ver detalhes de ${product.name}`}
                   className="aspect-[4/3] w-full overflow-hidden bg-[#141417] text-left cursor-pointer relative"
                 >
                   {/* Living cinemagraph image layer */}
                   <div
-                    className="w-full h-full animate-cinemagraph"
-                    style={{ animationDelay: `${idx * -2.1}s` }}
+                    className="w-full h-full"
                   >
                     <SafeImage
                       src={product.image}
@@ -229,8 +254,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                     className="pointer-events-none absolute inset-0 opacity-20 group-hover:opacity-65 transition-opacity duration-500"
                   >
                     <div
-                      className="absolute -inset-6 bg-[radial-gradient(circle_at_72%_28%,rgba(181,142,101,0.34),transparent_58%)] animate-orbit-glow"
-                      style={{ animationDelay: `${idx * -1.4}s` }}
+                      className="absolute -inset-6 bg-[radial-gradient(circle_at_72%_28%,rgba(181,142,101,0.34),transparent_58%)]"
                     />
                   </div>
 
@@ -240,8 +264,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                     className="pointer-events-none absolute inset-0 overflow-hidden opacity-25 group-hover:opacity-85 transition-opacity duration-300"
                   >
                     <div
-                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent animate-light-sweep"
-                      style={{ animationDelay: `${idx * -1.7}s` }}
+                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent"
                     />
                   </div>
 
@@ -280,7 +303,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                         <span className="text-base font-semibold text-[var(--text-primary)]">
                           {formatBRL(activePrice)}
                         </span>
-                        {product.promoPriceCents && (
+                        {product.promoPriceCents != null && (
                           <span className="ml-2 text-xs text-[var(--text-muted)] line-through">
                             {formatBRL(product.priceCents)}
                           </span>
@@ -304,21 +327,22 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                       </span>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2.5">
+                    <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-2.5">
                       <button
                         type="button"
                         onClick={() => openDetail(product)}
+                        aria-label={`Ver detalhes de ${product.name}`}
                         className="min-h-[40px] py-2 px-3 text-xs font-medium text-[var(--text-primary)] border border-[var(--border-strong)] hover:border-[var(--accent)] rounded-lg transition-colors cursor-pointer"
                       >
                         Ver Detalhes
                       </button>
                       <button
                         type="button"
-                        disabled={available === 0}
+                        disabled={available === 0 || Boolean(addingId)}
                         onClick={() => addToCart(product.id, 1)}
                         className="relative overflow-hidden min-h-[40px] py-2 px-3 text-xs font-semibold text-[var(--accent-fg)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 rounded-lg transition-colors cursor-pointer"
                       >
-                        <span className="relative z-10">Adicionar</span>
+                        <span className="relative z-10">{addingId === product.id ? 'Adicionando…' : 'Adicionar'}</span>
                         <span
                           aria-hidden="true"
                           className="pointer-events-none absolute inset-y-0 w-1/2 bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 group-hover:opacity-100 animate-sheen"
@@ -334,66 +358,52 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
       )}
 
       {/* Product Detail Modal */}
-      <AnimatePresence>
-        {selectedProduct &&
+      {selectedProduct &&
           (() => {
             const liveProduct =
               products.find((p) => p.id === selectedProduct.id) ?? selectedProduct;
-            const available = getAvailableStock(
-              liveProduct.physicalStock,
-              liveProduct.reservedStock,
-            );
+            const available = products.some((p) => p.id === liveProduct.id && p.active) ? storefrontStock(liveProduct) : 0;
             const unitPrice = liveProduct.promoPriceCents ?? liveProduct.priceCents;
             const relatedServices = services.filter((s) =>
               liveProduct.compatibleServiceIds.includes(s.id),
             );
 
             return (
-              <div
-                className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6"
-                role="dialog"
-                aria-modal="true"
+              <Modal
+                open
+                onDismiss={() => setSelectedProduct(null)}
+                dismissBlocked={Boolean(addingId)}
                 aria-labelledby="pdp-title"
+                className="fixed inset-x-0 bottom-0 top-auto m-0 max-h-[92dvh] w-full max-w-none overflow-y-auto rounded-t-2xl border border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xl backdrop:bg-black/75 sm:inset-0 sm:m-auto sm:w-[calc(100%-3rem)] sm:max-w-4xl sm:rounded-2xl"
               >
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  onClick={() => setSelectedProduct(null)}
-                  className="fixed inset-0 bg-black/75 backdrop-blur-sm"
-                />
-
-                <motion.div
-                  initial={{ opacity: 0, y: 16, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 12, scale: 0.98 }}
-                  transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-                  className="relative z-10 w-full sm:max-w-4xl max-h-[92dvh] overflow-y-auto bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-t-2xl sm:rounded-2xl shadow-2xl"
-                >
+                <div className="sticky top-0 z-20 h-0">
                   <button
                     type="button"
                     onClick={() => setSelectedProduct(null)}
+                    data-initial-focus
+                    disabled={Boolean(addingId)}
                     aria-label="Fechar detalhes do produto"
-                    className="absolute top-3.5 right-3.5 z-20 min-w-[40px] min-h-[40px] flex items-center justify-center bg-[#0B0B0D]/80 text-[#E7E2DB] hover:text-[#B58E65] rounded-lg transition-colors cursor-pointer"
+                    className="absolute top-3.5 right-3.5 z-20 min-w-[44px] min-h-[44px] flex items-center justify-center bg-[#0B0B0D]/85 text-[#E7E2DB] hover:text-[#B58E65] rounded-lg transition-colors cursor-pointer"
                   >
                     <X className="w-5 h-5" />
                   </button>
 
+                </div>
                   <div className="grid grid-cols-1 md:grid-cols-12">
                     {/* Left Living Cinemagraph Studio Media */}
                     <div className="md:col-span-6 bg-[#141417] relative overflow-hidden flex items-center justify-center">
-                      <div className="w-full h-full min-h-[240px] sm:min-h-[280px] animate-cinemagraph">
+                      <div className="w-full h-full min-h-[160px] sm:min-h-[280px]">
                         <SafeImage
                           src={liveProduct.image}
                           alt={liveProduct.name}
-                          className="w-full h-full min-h-[240px] sm:min-h-[280px] object-cover"
+                          className="w-full h-full min-h-[160px] sm:min-h-[280px] object-cover"
                         />
                       </div>
                       <div
                         aria-hidden="true"
                         className="pointer-events-none absolute inset-0 overflow-hidden opacity-45"
                       >
-                        <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent animate-light-sweep" />
+                        <div className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent" />
                       </div>
                     </div>
 
@@ -415,7 +425,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                           <span className="text-2xl font-semibold text-[var(--accent)]">
                             {formatBRL(unitPrice)}
                           </span>
-                          {liveProduct.promoPriceCents && (
+                          {liveProduct.promoPriceCents != null && (
                             <span className="text-sm text-[var(--text-muted)] line-through">
                               {formatBRL(liveProduct.priceCents)}
                             </span>
@@ -430,25 +440,26 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                         </p>
 
                         {/* Quantity + Primary Add to Bag */}
-                        <div className="pt-2 flex items-center gap-3">
+                        <div className="pt-2 flex flex-wrap items-center gap-2">
                           <div className="inline-flex items-center border border-[var(--border-strong)] rounded-lg bg-[var(--bg-input)]">
                             <button
                               type="button"
-                              onClick={() => setModalQty((q) => Math.max(1, q - 1))}
+                              onClick={() => setModalQty((q) => Math.max(1, Math.min(q, available) - 1))}
+                              disabled={modalQty <= 1 || available <= 1 || Boolean(addingId)}
                               aria-label="Diminuir quantidade"
-                              className="px-3 py-2.5 text-[var(--text-primary)] hover:text-[var(--accent)] cursor-pointer"
+                              className="min-h-11 px-3 py-2.5 text-[var(--text-primary)] hover:text-[var(--accent)] cursor-pointer"
                             >
                               <Minus className="w-4 h-4" />
                             </button>
                             <span className="px-3 text-sm font-mono tabular-nums text-[var(--text-primary)]">
-                              {modalQty}
+                              {Math.min(modalQty, Math.max(1, available))}
                             </span>
                             <button
                               type="button"
-                              onClick={() => setModalQty((q) => Math.min(available, q + 1))}
-                              disabled={modalQty >= available}
+                              onClick={() => setModalQty((q) => Math.min(99, available, q + 1))}
+                              disabled={modalQty >= Math.min(99, available) || Boolean(addingId)}
                               aria-label="Aumentar quantidade"
-                              className="px-3 py-2.5 text-[var(--text-primary)] hover:text-[var(--accent)] disabled:opacity-35 cursor-pointer"
+                              className="min-h-11 px-3 py-2.5 text-[var(--text-primary)] hover:text-[var(--accent)] disabled:opacity-35 cursor-pointer"
                             >
                               <Plus className="w-4 h-4" />
                             </button>
@@ -456,23 +467,24 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
 
                           <button
                             type="button"
-                            disabled={available === 0}
+                            disabled={available === 0 || Boolean(addingId)}
                             onClick={async () => {
-                              if (await addToCart(liveProduct.id, modalQty)) {
+                              if (await addToCart(liveProduct.id, Math.min(modalQty, available, 99))) {
                                 setSelectedProduct(null);
                                 setCartOpen(true);
                               }
                             }}
                             className="flex-1 min-h-[44px] py-2.5 px-4 text-sm font-semibold text-[var(--accent-fg)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-40 rounded-lg transition-colors cursor-pointer"
                           >
-                            {available > 0 ? 'Adicionar à Sacola' : 'Indisponível'}
+                            {addingId === liveProduct.id ? 'Adicionando…' : available > 0 ? 'Adicionar à sacola' : 'Indisponível'}
                           </button>
                         </div>
 
                         <p className="text-xs text-[var(--text-muted)] font-mono tabular-nums">
-                          Disponível agora: {available} un. (Físico: {liveProduct.physicalStock} ·
-                          Reservado: {liveProduct.reservedStock})
+                          Disponível para compra: {available} un.
                         </p>
+
+                        {cartNotice && <p role="status" className="text-sm text-[var(--text-primary)]">{cartNotice}</p>}
 
                         <div className="pt-4 border-t border-[var(--border-subtle)] space-y-3 text-xs">
                           <div>
@@ -518,11 +530,9 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
                       </div>
                     </div>
                   </div>
-                </motion.div>
-              </div>
+              </Modal>
             );
           })()}
-      </AnimatePresence>
     </div>
   );
 };

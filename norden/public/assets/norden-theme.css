@@ -1,0 +1,65 @@
+/* Light Mode (Soft Stone & Grafite Editorial) */
+:root {
+  color-scheme: light;
+  --bg-canvas: #F5F2EC;
+  --bg-band: #ECE7DF;
+  --bg-surface: #FFFFFF;
+  --bg-surface-alt: #F1ECE4;
+  --bg-input: #FAF8F5;
+  --bg-header: rgba(245, 242, 236, 0.92);
+  --bg-footer: #EAE4DC;
+  --text-primary: #141417;
+  --text-secondary: #373431;
+  --text-muted: #5F564D;
+  --accent: #805D3C;
+  --accent-hover: #765636;
+  --accent-fg: #FFFFFF;
+  --border-subtle: rgba(95, 86, 77, 0.16);
+  --border-strong: rgba(95, 86, 77, 0.30);
+  --tab-active-bg: #1F1F23;
+  --tab-active-fg: #F5F2EC;
+  --status-warn: #B45309;
+  --status-danger: #B91C1C;
+  --shadow-card: 0 10px 28px -12px rgba(20, 20, 23, 0.12);
+}
+
+/* Dark Mode (Grafite Premium & Ônix Black) */
+.dark {
+  color-scheme: dark;
+  --bg-canvas: #0B0B0D;
+  --bg-band: #111114;
+  --bg-surface: #1F1F23;
+  --bg-surface-alt: #16161A;
+  --bg-input: #0B0B0D;
+  --bg-header: rgba(11, 11, 13, 0.92);
+  --bg-footer: #08080A;
+  --text-primary: #E7E2DB;
+  --text-secondary: #CFC7BC;
+  --text-muted: #9C9288;
+  --accent: #B58E65;
+  --accent-hover: #C6A077;
+  --accent-fg: #0B0B0D;
+  --border-subtle: rgba(140, 129, 118, 0.20);
+  --border-strong: rgba(140, 129, 118, 0.36);
+  --tab-active-bg: #E7E2DB;
+  --tab-active-fg: #0B0B0D;
+  --status-warn: #FBBF24;
+  --status-danger: #F87171;
+  --shadow-card: 0 16px 36px -14px rgba(0, 0, 0, 0.65);
+}
+
+:root {
+  --norden-onyx: #0B0B0D;
+  --norden-graphite: #1F1F23;
+  --norden-taupe: #8C8176;
+  --norden-bronze: #8E6B47;
+  --norden-stone: #E7E2DB;
+  --control-radius: 0.5rem;
+  --control-size: 2.75rem;
+  --layer-tabs: 20;
+  --layer-header: 30;
+  --layer-menu: 40;
+  --layer-toast: 50;
+  --layer-skip: 60;
+  --layer-dialog: 70;
+}

@@ -1,5 +1,5 @@
 import {state,esc,api,action,brand,icon,link,button,form,empty,dataOf,selected,checked,find,guestCart,saveCart,
-  cartCount,loadingView,liveRoute,internalRoute} from './ui.mjs';
+  cartCount,loadingView,liveRoute,internalRoute,themeButton} from './ui.mjs';
 import {header,footer,landing,publicPage,authView,accountHome} from './public.mjs';
 import {clientPage,manualSections} from './client.mjs';
 import {adminPage} from './admin.mjs';
@@ -8,6 +8,23 @@ const app=document.querySelector('#app');
 const toast=document.querySelector('#toast');
 let messageTimer,version=0;
 const bookingKey='norden-booking';
+const checkoutKey='norden-checkout-pending';
+function pendingOrder(quote) {
+  const clientId=state.data.user.id;
+  try {
+    const previous=JSON.parse(sessionStorage.getItem(checkoutKey)??'null');
+    if(previous?.clientId===clientId&&previous.quoteKey===quote.key&&typeof previous.requestKey==='string') return previous.requestKey;
+  } catch { /* The current page can still retry with the same key. */ }
+  return typeof crypto.randomUUID==='function'?crypto.randomUUID():
+    Array.from(crypto.getRandomValues(new Uint8Array(16)),byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+function rememberOrder(quoteKey,requestKey) {
+  try { sessionStorage.setItem(checkoutKey,JSON.stringify({clientId:state.data.user.id,quoteKey,requestKey})); }
+  catch { /* Page state still protects replays until navigation. */ }
+}
+function forgetOrder() {
+  try { sessionStorage.removeItem(checkoutKey); } catch { /* Storage may be unavailable. */ }
+}
 const clientNav=[
   ['/app','Início','home'],['/app/agendamentos','Agenda','calendar'],['/app/jornada','Journey','clock'],
   ['/app/cuidados','Care','book'],['/app/realocacoes','Flow','flow'],['/loja','Loja','bag'],
@@ -22,7 +39,11 @@ const adminNav=[
   ['/gestao/estoque','Estoque','grid'],['/gestao/manuais','Manuais Care','book'],['/gestao/pedidos','Pedidos','bag'],
   ['/gestao/conteudo','Conteúdo público','grid'],['/gestao/configuracoes','Configurações','menu'],['/gestao/auditoria','Auditoria','shield']
 ];
-const onlyLocal=target=>typeof target==='string' && /^\/(?![\\/])/.test(target) ? target : '';
+const onlyLocal=target=>{
+  if(typeof target!=='string'||!target.startsWith('/')||/[\\\u0000-\u0020\u007f]/.test(target)) return '';
+  const url=new URL(target,location.origin);
+  return url.origin===location.origin&&!target.startsWith('//')?target:'';
+};
 const authPaths=['/login','/cadastro','/app/cadastro','/app/entrar','/gestao/entrar','/recuperar-senha','/conta/redefinir','/conta/verificar','/conta/convite'];
 const entryPath=path=>['/app','/gestao',...authPaths].includes(path);
 function popup(message,error=false) {
@@ -32,11 +53,7 @@ function popup(message,error=false) {
 }
 async function load(entry=false) {
   state.data=await api(entry?'boot?view=entry':'boot');
-  if(state.data.production) {
-    let dark=false;
-    try { dark=localStorage.getItem('norden_theme')==='dark'; } catch { /* Use the default theme. */ }
-    document.documentElement.classList.toggle('portal-light',!dark);
-  }
+  state.dark=document.documentElement.classList.contains('dark');
 }
 try {
   const d=JSON.parse(sessionStorage.getItem(bookingKey)??'null');
@@ -85,9 +102,9 @@ function workspace(body,path,admin) {
   return `<div class="workspace"><aside class="sidebar" id="area-nav">${brand()}<div class="side-caption">${admin?(user.role==='gestor'?'ADMINISTRAÇÃO':'ÁREA PROFISSIONAL'):'ÁREA DO CLIENTE'}</div>
     <nav aria-label="Navegação da área">${nav.map(item=>navLink(item,path)).join('')}</nav>
     <div class="side-foot">${link('/','Página inicial','side-link','home')}${form('logout',button('Sair','side-link'))}</div></aside>
-    <div class="workspace-body"><header class="workspace-header"><div class="workspace-ident"><button type="button" class="icon-button area-menu" aria-label="Abrir menu da área" aria-expanded="false" data-command="sideMenu">${icon('menu')}</button>
+    <div class="workspace-body"><header class="workspace-header"><div class="workspace-ident"><button type="button" class="icon-button area-menu" aria-label="Abrir menu da área" aria-controls="area-nav" aria-expanded="false" data-command="sideMenu">${icon('menu')}</button>
     <a href="${home}" class="workspace-name">${admin?'Gestão NORDEN':'Minha área'}</a></div>
-    <div class="workspace-actions">${state.data.production?'':'<span class="demo-label">Demonstração</span>'}
+    <div class="workspace-actions">${themeButton()}${state.data.production?'':'<span class="demo-label">Demonstração</span>'}
     <a href="${home+'/notificacoes'}" class="icon-button cart-icon" aria-label="Notificações, ${notifications} não lidas">${icon('bell')}${notifications?'<b>'+notifications+'</b>':''}</a>
     ${admin?'':`<a href="/app/carrinho" class="icon-button cart-icon" aria-label="Carrinho, ${cartCount()} ${cartCount()===1?'item':'itens'}">${icon('bag')}${cartCount()?'<b>'+cartCount()+'</b>':''}</a>`}
     <span class="user-initial" aria-label="${esc(user.name)}">${esc(user.name[0])}</span></div></header>
@@ -173,15 +190,27 @@ async function refresh(message) { await load(); await draw(); if(message) popup(
 async function slots(date,keep=false) {
   const d=state.draft;
   if(!d) return;
-  if(!date) { d.slots=null; await draw(); return; }
-  const key=[d.serviceId,d.professionalId,date].join('/');
-  state.slotRequest=key;
-  const result=await api('disponibilidade?'+new URLSearchParams({serviceId:d.serviceId,professionalId:d.professionalId,date}));
-  if(state.slotRequest!==key||state.route!=='/app/agendar') return;
-  Object.assign(d,{date,price:result.price,slots:result.slots,lastError:''});
-  if(!keep||!result.slots.some(s=>s.clock===d.clock)) d.clock='';
+  const request=Symbol();
+  state.slotRequest=request;
+  const clock=keep?d.clock:'';
+  Object.assign(d,{date,slots:null,clock:'',lastError:''});
+  saveDraft();
+  if(!date) { await draw(); return; }
+  try {
+    const result=await api('disponibilidade?'+new URLSearchParams({serviceId:d.serviceId,professionalId:d.professionalId,date}));
+    if(state.slotRequest!==request||state.draft!==d||d.step!==4||state.route!=='/app/agendar') return;
+    Object.assign(d,{price:result.price,duration:result.duration,padding:result.padding,slots:result.slots});
+    d.clock=result.slots.some(s=>s.clock===clock)?clock:'';
+  } catch(error) {
+    if(state.slotRequest!==request||state.draft!==d||d.step!==4||state.route!=='/app/agendar') return;
+    d.lastError=error.message;
+  }
   saveDraft();
   await draw();
+}
+function focusBookingStep() {
+  const heading=app.querySelector('.wizard-panel h2');
+  if(heading) { heading.tabIndex=-1; heading.focus(); }
 }
 async function booking(form,fields) {
   const d=state.draft;
@@ -195,7 +224,13 @@ async function booking(form,fields) {
     d.professionalId=fields.professionalId;d.clock='';d.slots=null;
   }
   if(d.step===3) d.preferences=selected(form,'preferences');
-  if(d.step===4) { d.date=fields.date;d.clock=fields.clock; }
+  if(d.step===4) {
+    if(fields.date!==d.date||!d.slots?.some(s=>s.clock===fields.clock)) {
+      await slots(fields.date);
+      return;
+    }
+    d.clock=fields.clock;
+  }
   if(d.step<5) {
     d.step++;
     saveDraft();
@@ -203,6 +238,7 @@ async function booking(form,fields) {
       await draw();
       await slots(d.date,true);
     } else await draw();
+    focusBookingStep();
     return;
   }
   if(state.data.user?.role!=='cliente') {
@@ -219,7 +255,8 @@ async function booking(form,fields) {
   } catch(error) {
     if(error.status!==409) throw error;
     await load();
-    if(!find('services',d.serviceId)||!find('professionals',d.professionalId)) {
+    if(!find('services',d.serviceId)?.active||!find('professionals',d.professionalId)?.active||
+        !state.data.catalog.compatibility.some(c=>c.service_id===d.serviceId&&c.professional_id===d.professionalId)) {
       state.draft=null;
       saveDraft();
       await draw();
@@ -235,22 +272,54 @@ async function booking(form,fields) {
   }
 }
 function updateGuest(fields,delta) {
+  if(state.data.user) throw new Error('Entre com uma conta de cliente para comprar.');
   const cart=guestCart(),p=find('products',fields.productId);
   const quantity=delta?(cart[fields.productId]??0)+Number(fields.quantity):Number(fields.quantity);
   if(quantity&&(!p?.active||!Number.isInteger(quantity)||quantity<1||quantity>Math.min(99,p.available))) throw new Error('Quantidade indisponível em estoque.');
   if(quantity) cart[fields.productId]=quantity;else delete cart[fields.productId];
-  saveCart(cart);
+  if(!saveCart(cart)) throw new Error('O armazenamento da sacola está indisponível. Entre na sua conta para comprar.');
 }
 async function importGuest() {
   if(state.data.user?.role!=='cliente') return;
-  const guest=guestCart();
-  const entries=Object.entries(guest);
-  if(!entries.length) return;
-  for(const [productId,delta] of entries) {
-    try { state.data.cart=await action('cartItem',{productId,delta});delete guest[productId]; }
-    catch { popup('Um item do carrinho local não estava disponível para a conta.',true); }
-  }
-  saveCart(guest);
+  const merge=async()=>{
+    const guest=guestCart();
+    if(!Object.keys(guest).length) return;
+    const transferKey='norden-cart-transfer:'+state.data.user.id;
+    let transfers;
+    try { transfers=new Map(JSON.parse(localStorage.getItem(transferKey)??'[]')); }
+    catch { transfers=new Map(); }
+    const saveTransfers=()=>{
+      try { localStorage.setItem(transferKey,JSON.stringify([...transfers])); return true; }
+      catch { return false; }
+    };
+    for(const [productId,delta] of Object.entries(guest)) {
+      const current=state.data.cart.items.find(item=>item.id===productId)?.quantity??0;
+      const previous=transfers.get(productId);
+      const quantity=previous?.delta===delta&&Number.isInteger(previous.quantity)?previous.quantity:current+delta;
+      transfers.set(productId,{delta,quantity});
+      if(!saveTransfers()) {
+        popup('O armazenamento da sacola está indisponível. Adicione os itens pela sua conta.',true);
+        break;
+      }
+      try { state.data.cart=await action('cartItem',{productId,transferQuantity:quantity}); }
+      catch(error) {
+        if(![400,404,409].includes(error.status)) {
+          popup('A transferência da sacola foi interrompida. Entre novamente para retomar.',true);
+          break;
+        }
+        transfers.delete(productId);
+        saveTransfers();
+        popup('Um item da sacola local continuou fora da conta por falta de disponibilidade.',true);
+        continue;
+      }
+      delete guest[productId];
+      if(!saveCart(guest)) break;
+      transfers.delete(productId);
+      saveTransfers();
+    }
+  };
+  if(navigator.locks) await navigator.locks.request('norden-cart-import',merge);
+  else await merge();
 }
 const direct={
   productPrice:['productPrice','Preço atualizado no catálogo.'],
@@ -285,7 +354,7 @@ async function dispatch(name,form,fields,phase) {
     return;
   }
   if(name==='login'||name==='register'||name==='redeem') {
-    await action(name,fields);
+    const result=await action(name,fields);
     await load();
     await importGuest();
     const target=internalRoute(onlyLocal(fields.target));
@@ -295,17 +364,18 @@ async function dispatch(name,form,fields,phase) {
     }
     const incompatible=(state.data.user?.role==='cliente'&&target.startsWith('/gestao'))||(state.data.user?.role!=='cliente'&&target.startsWith('/app'));
     go(!target||incompatible?accountHome():target,true);
-    if(name==='register') popup(state.data.production?'Conta criada.':'Conta de demonstração criada.');
+    if(name==='register') popup(result.verificationFailed?'Conta criada. O envio da verificação falhou. Solicite outro link no perfil.':state.data.production?'Conta criada.':'Conta de demonstração criada.');
     return;
   }
   if(name==='logout') {
     await action('logout');
+    forgetOrder();
     if(state.data.production) { location.replace('/');return; }
     await load();go('/',true);popup('Sessão encerrada.');return;
   }
   if(name==='recover') {
     await action('recover',fields);
-    popup(state.data.production?'Se a conta existir, enviaremos um link por e-mail.':'Se a conta existir, o link ficará na caixa de saída local.');
+    popup(state.data.production?'Se a conta puder receber mensagens, o envio será tentado. Se o link não chegar, fale com a equipe.':'Se a conta existir, o link ficará na caixa de saída local.');
     form.reset();
     return;
   }
@@ -333,11 +403,15 @@ async function dispatch(name,form,fields,phase) {
   }
   if(name==='address') { await action(name,{...fields,...parseAddress(fields)}); await refresh('Endereço salvo.'); return; }
   if(name==='quote') {
-    state.checkout={...fields,address:parseAddress(fields)};
+    const details={...fields,address:parseAddress(fields)};
     state.quote=null;
-    try { state.quote=await action('quote',state.checkout); }
-    catch(error) { await draw();popup(error.message,true);return; }
-    state.requestKey=globalThis.crypto?.randomUUID?.()??(String(Date.now())+Math.random().toString(36).slice(2));
+    document.querySelector('.quote-pane form')?.remove();
+    const quote=await action('quote',details);
+    const current=dataOf(form);
+    if(!form.isConnected||Object.entries(fields).some(([key,value])=>current[key]!==value)) return;
+    state.checkout=details;
+    state.quote=quote;
+    state.requestKey=pendingOrder(quote);
     await draw();
     popup('Valores calculados. Revise o total.');
     document.querySelector('.quote-pane form button')?.focus({preventScroll:true});
@@ -345,7 +419,10 @@ async function dispatch(name,form,fields,phase) {
   }
   if(name==='checkout') {
     try {
-      const result=await action(name,{...state.checkout,quoteKey:state.quote?.key,requestKey:state.requestKey});
+      const quoteKey=state.quote.key,requestKey=state.requestKey;
+      rememberOrder(quoteKey,requestKey);
+      const result=await action(name,{...state.checkout,quoteKey,requestKey});
+      forgetOrder();
       await load();
       go('/app/pedidos/'+result.id);
       popup('Pedido registrado.');
@@ -437,7 +514,8 @@ document.addEventListener('submit',async event=>{
   error.hidden=true;
   form.dataset.pending='1';
   form.setAttribute('aria-busy','true');
-  if(submitter) submitter.disabled=true;
+  const submitLabel=submitter?.textContent;
+  if(submitter) { submitter.disabled=true; submitter.textContent='Enviando…'; }
   try { await dispatch(form.dataset.form,form,fields,phase); }
   catch(error) {
     if(error.status===401&&state.data.user&&form.dataset.form!=='login') { await load();go('/login?voltar='+encodeURIComponent(location.pathname));popup('Sessão expirada. Entre novamente.',true); }
@@ -446,7 +524,7 @@ document.addEventListener('submit',async event=>{
   } finally {
     delete form.dataset.pending;
     form.removeAttribute('aria-busy');
-    if(submitter) submitter.disabled=false;
+    if(submitter) { submitter.disabled=false; submitter.textContent=submitLabel; }
   }
 });
 document.addEventListener('click',async event=>{
@@ -467,8 +545,17 @@ document.addEventListener('click',async event=>{
           const open=document.querySelector('.workspace').classList.toggle('side-open');
           command.setAttribute('aria-expanded',String(open));break;
         }
+        case 'theme': {
+          const dark=state.dark=document.documentElement.classList.toggle('dark');
+          const label=dark?'Ativar modo claro':'Ativar modo escuro';
+          command.setAttribute('aria-label',label);
+          command.title=label;
+          command.innerHTML=icon(dark?'sun':'moon',18);
+          try { localStorage.setItem('norden_theme',dark?'dark':'light'); } catch { /* The theme applies until navigation. */ }
+          break;
+        }
         case 'retry': await init();break;
-        case 'previousStep': state.draft.step--;saveDraft();await draw();break;
+        case 'previousStep': state.draft.step--;saveDraft();await draw();focusBookingStep();break;
         case 'slots': await slots(form.elements.date.value);break;
         case 'manualPreview': {
           const fields=dataOf(form);
@@ -499,8 +586,7 @@ document.addEventListener('change',async event=>{
   const input=event.target,form=input.closest('form');
   if(!form) return;
   if(input.dataset.watch==='bookDate') {
-    state.draft.date=input.value;state.draft.clock='';state.draft.slots=null;saveDraft();
-    try { await slots(input.value); } catch(error) { blankError(form,error); }
+    await slots(input.value);
   }
   if(input.dataset.watch==='checkout') {
     const fields=dataOf(form);
@@ -509,12 +595,21 @@ document.addEventListener('change',async event=>{
 });
 document.addEventListener('input',event=>{
   const form=event.target.closest('form');
+  const password=form?.elements.namedItem('password'),confirm=form?.elements.namedItem('confirm');
+  if(password instanceof HTMLInputElement&&password.type==='password'&&confirm instanceof HTMLInputElement&&(event.target===password||event.target===confirm)) {
+    confirm.setCustomValidity(confirm.value&&confirm.value!==password?.value?'As senhas não coincidem.':'');
+  }
   if(form?.dataset.form==='quote'&&state.quote) {
     state.quote=null;
     const pane=document.querySelector('.quote-pane');
     pane.querySelector('form')?.remove();
     if(!pane.querySelector('.quote-stale')) pane.insertAdjacentHTML('beforeend','<p class="hint quote-stale">Dados alterados. Calcule novamente para confirmar.</p>');
   }
+});
+document.addEventListener('keydown',event=>{
+  if(event.key!=='Escape') return;
+  const trigger=app.querySelector('[data-command="sideMenu"][aria-expanded="true"],[data-command="menu"][aria-expanded="true"]');
+  if(trigger) { trigger.click();trigger.focus(); }
 });
 window.addEventListener('popstate',()=>draw(true));
 async function init() {

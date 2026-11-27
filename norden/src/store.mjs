@@ -40,7 +40,7 @@ async function low(db,product,ref) {
   const p=await db.get('SELECT name,active,physical-reserved AS available,threshold FROM products WHERE id=?',product);
   if(p.active && p.available<=p.threshold) await notifyManagers(db,'Estoque baixo: '+p.name,'/gestao/estoque','stock:low:'+ref+':'+product);
 }
-export async function deliveryQuote(db,body,user) {
+export async function deliveryQuote(db,body,user,{production=false}={}) {
   client(user);
   const {items,subtotal}=await cart(db,user);
   if(items.length===0) fail('Seu carrinho está vazio.',409);
@@ -57,15 +57,16 @@ export async function deliveryQuote(db,body,user) {
       if(!stored) fail('Endereço indisponível.',404);
       destination.address=parse(stored.values_json);
     } else destination.address=address(body.address);
-    const distance=Number(String(body.distance ?? '').replace(',','.'));
-    if(!Number.isFinite(distance)||distance<=0||Math.round(distance*100)/100!==distance) fail('Informe a distância estimada em quilômetros, com até duas casas decimais.');
+    const text=String(body.distance??'').trim();
+    const distance=Number(text.replace(',','.'));
+    if(!/^\d+(?:[,.]\d{1,2})?$/.test(text)||!Number.isFinite(distance)||distance<=0) fail('Informe a distância estimada em quilômetros, com até duas casas decimais.');
     if(distance>settings.deliveryMax) fail('Endereço fora da cobertura de '+settings.deliveryMax+' km. A retirada está disponível.',409);
     Object.assign(rules,{distance,rate:settings.deliveryRate,max:settings.deliveryMax,base:settings.deliveryBase,
       minimum:settings.deliveryMinimum,estimated:true});
     fee=Math.max(rules.minimum,rules.base+Math.round(Math.round(distance*100)*rules.rate/100));
   }
-  const snapshot={mode,destination,rules,subtotal,fee,total:subtotal+fee,payment:settings.payment,
-    items:items.map(p=>({id:p.id,name:p.name,quantity:p.quantity,price:p.unitPrice}))};
+  const snapshot={mode,destination,rules,subtotal,fee,total:subtotal+fee,payment:production?'presencial':settings.payment,
+    items:items.map(p=>({id:p.id,name:p.name,quantity:p.quantity,price:p.unitPrice,discount:p.price-p.unitPrice}))};
   return {...snapshot,key:hash(encode(snapshot))};
 }
 const validTransitions = {
@@ -80,8 +81,11 @@ export const storeActions = {
       const p=await db.get('SELECT * FROM products WHERE id=?',productId);
       if(!p) fail('Produto indisponível.',404);
       const delta=body.delta!==undefined ? integer(body.delta,'quantidade',1,99) : 0;
-      const current=delta ? (await db.get('SELECT quantity FROM cart_items WHERE client_id=? AND product_id=?',user.id,productId))?.quantity ?? 0 : 0;
-      const quantity=delta ? integer(current+delta,'quantidade',0,99) : integer(body.quantity,'quantidade',0,99);
+      const transfer=body.transferQuantity!==undefined;
+      const current=(delta||transfer)?(await db.get('SELECT quantity FROM cart_items WHERE client_id=? AND product_id=?',user.id,productId))?.quantity??0:0;
+      const quantity=transfer?integer(body.transferQuantity,'quantidade',1,99):
+        delta?integer(current+delta,'quantidade',0,99):integer(body.quantity,'quantidade',0,99);
+      if(transfer&&current>=quantity) return await cart(db,user);
       if(quantity===0) await db.run('DELETE FROM cart_items WHERE client_id=? AND product_id=?',user.id,productId);
       else {
         if(!p.active || p.physical-p.reserved<quantity) fail('Quantidade indisponível em estoque.',409);
@@ -104,13 +108,13 @@ export const storeActions = {
     return {id:ref};
   },
   quote:deliveryQuote,
-  async checkout(db,body,user) {
+  async checkout(db,body,user,ctx) {
     client(user);
     const key=str(body.requestKey,'identificador do pedido',100,16);
     return await db.tx(async ()=>{
       const existing=await db.get('SELECT id FROM orders WHERE client_id=? AND request_key=?',user.id,key);
       if(existing) return {id:existing.id};
-      const quote=await deliveryQuote(db,body,user);
+      const quote=await deliveryQuote(db,body,user,ctx);
       if(quote.key!==body.quoteKey) fail('O carrinho ou a taxa mudou. Calcule e revise os valores novamente.',409);
       const ref=id();
       await db.run("INSERT INTO orders VALUES(?,?,?,?,'RECEBIDO',?,?,?,?,?,?,?)",ref,user.id,key,quote.mode,quote.payment==='simulado'?'SIMULADO':'NAO_PAGO',

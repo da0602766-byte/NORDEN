@@ -92,6 +92,28 @@ Cadastros pelo site geram apenas contas de cliente. O gestor pode criar convites
 | `NORDEN_SECURE_COOKIE` | `0` | Configure `1` quando a instância for servida por HTTPS |
 | `NORDEN_DEMO_PASSWORD` | Aleatória | Opcional, usada somente na primeira carga fictícia |
 
+### Prévia local da vitrine React e dos portais
+
+Na raiz do repositório, gere a mesma vitrine React usada no build hospedado e inicie a prévia em uma base SQLite nova. O comando vincula a escuta a `127.0.0.1` e usa a caixa de saída local. O pagamento aparece como presencial para representar o fluxo hospedado.
+
+```sh
+npm --prefix norden ci
+npm --prefix preview ci
+npm --prefix norden run build
+npm --prefix preview run build:live
+export NORDEN_DATA="$(mktemp -d)"
+npm --prefix norden run seed
+PORT=4173 npm --prefix norden start -- --live-preview
+```
+
+Abra [a página inicial](http://127.0.0.1:4173/), [a loja](http://127.0.0.1:4173/loja), [a área do cliente](http://127.0.0.1:4173/usuario) e [a gerência](http://127.0.0.1:4173/gerencia). Use os acessos fictícios que a carga exibiu. No PowerShell, separe a carga e a inicialização da mesma forma, definindo `$env:NORDEN_DATA` antes dos dois comandos. Para a demonstração independente, execute `npm --prefix preview run dev`. Para gerar a saída da demonstração em uma pasta à parte, execute `npm --prefix preview run build:pages -- --outDir ../norden/dist/pages-qa`.
+
+### Preparação operacional após aprovação
+
+- **Agenda.** Em **Gerência → Profissionais**, cadastre ou ative cada integrante real. Vincule os serviços no formulário do profissional e confira duração e intervalo em **Serviços**. Em **Profissionais**, salve os períodos de expediente por dia e divida os intervalos em dois períodos. Em **Agenda**, registre bloqueios pontuais e consulte uma data em que haja expediente no horário de Brasília.
+- **E-mail de conta.** Prepare em homologação um remetente verificado e uma origem HTTPS. Configure `NORDEN_SMTP_URL`, `NORDEN_MAIL_FROM` e `NORDEN_SITE_URL` no ambiente aprovado. Confira cadastro, reenvio e recuperação com uma caixa controlada antes de habilitar o envio para clientes.
+- **Entrega.** A cotação identifica a distância informada e o valor estimado. Confirme com o cliente a cobertura e a taxa antes do pagamento presencial. Quando o valor divergir, a equipe combina o ajuste com o cliente antes de seguir. O sistema mantém o total histórico do pedido original. Um cálculo geográfico exige origem do salão, um provedor de geocodificação e roteamento e aprovação dos custos e da política de cobrança.
+
 ## Percursos de demonstração
 
 1. **Atendimento e compra.** Entre como cliente e agende um serviço. Na conta profissional correspondente ou como gestor, abra a reserva, inicie o atendimento, registre o procedimento e os produtos, revise o manual e conclua. Volte ao cliente, abra o Journey e o Care, siga um link de produto, adicione ao carrinho, revise a retirada ou a entrega e confirme. Na gestão, percorra a fila de pedidos e confira as movimentações do estoque.

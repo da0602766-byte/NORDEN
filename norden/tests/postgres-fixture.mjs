@@ -7,6 +7,8 @@ export async function testPostgres() {
   const postgres=new PGlite({extensions:{btree_gist}});
   const migration=new URL('../../supabase/migrations/20261126231645_norden_schema.sql',import.meta.url);
   await postgres.exec(readFileSync(migration,'utf8'));
+  const indexes=new URL('../../supabase/migrations/20261127004533_norden_query_indexes.sql',import.meta.url);
+  await postgres.exec(readFileSync(indexes,'utf8'));
   let pending=Promise.resolve();
   const pool={
     async connect() {
