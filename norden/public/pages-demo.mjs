@@ -17,7 +17,7 @@ export async function demoApi(path,body) {
     if(path==='action/logout') {selectRole('guest');return {ok:true};}
     throw new Error('Prévia do GitHub Pages: esta ação precisa do servidor NORDEN. Use os perfis de demonstração no topo para explorar as telas. Nenhum dado foi enviado ou salvo.');
   }
-  if(path==='boot') return snapshot('boot-'+role);
+  if(path==='boot'||path==='boot?view=entry') return snapshot('boot-'+role);
   if(path.startsWith('disponibilidade?')) throw new Error('A consulta de horários em tempo real está disponível na versão com servidor. Esta prévia não recebe agendamentos.');
   const details=await snapshot('details-'+role);
   if(Object.hasOwn(details,path)) return details[path];

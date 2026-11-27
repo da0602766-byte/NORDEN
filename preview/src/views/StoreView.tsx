@@ -9,6 +9,7 @@ import type { Product } from '../types';
 type StoreProps = Pick<ReturnType<typeof useNorden>, 'products' | 'services' | 'setCartOpen' | 'cartCount' | 'startBookingWithService'> & {
   addToCart: (id: string, quantity?: number) => boolean | Promise<boolean>;
   deliverySettings?: ReturnType<typeof useNorden>['deliverySettings'];
+  loading?: boolean;
 };
 
 export const StoreView: React.FC = () => <StoreContent {...useNorden()} />;
@@ -22,6 +23,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
     cartCount,
     startBookingWithService,
     deliverySettings,
+    loading,
   } = props;
 
   const [search, setSearch] = useState('');
@@ -163,7 +165,7 @@ export const StoreContent: React.FC<StoreProps> = (props) => {
       </div>
 
       {/* Product Grid with Cinemagraph Hover & Infinite Living Studio Motion */}
-      {filteredProducts.length === 0 ? (
+      {loading ? null : filteredProducts.length === 0 ? (
         <div className="py-20 text-center border border-[var(--border-subtle)] rounded-xl bg-[var(--bg-surface)]">
           <p className="font-display text-lg text-[var(--text-primary)]">
             Nenhum produto encontrado

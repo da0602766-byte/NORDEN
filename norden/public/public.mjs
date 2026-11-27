@@ -162,7 +162,7 @@ export function authView(path,targetOverride='') {
     title='Confirme seu e-mail';sub=production?'Confirme o e-mail associado à sua conta.':'Use o link de verificação da caixa de saída local.';code='verify';
   } else fields=mail+secret;
   const cta={login:'Entrar',register:'Criar conta',recover:'Solicitar recuperação',reset:'Salvar nova senha',verify:'Confirmar e-mail',redeem:'Ativar conta'}[code];
-  return `<div class="auth-layout"><aside class="auth-image">${img('/assets/norden-original.png','Logotipo oficial do NORDEN','', 'fetchpriority="high"')}</aside>
+  return `<div class="auth-layout"><aside class="auth-image">${img('/assets/norden-auth.jpg','Logotipo oficial do NORDEN','', 'decoding="async"')}</aside>
     <div class="auth-body">${eyebrow('CONTA NORDEN')}<h1>${title}</h1><p>${sub}</p>
     ${recover&&production&&!state.data.accountEmailEnabled?'':form(code,hidden('target',target)+hidden('token',token)+hidden('area',production&&code==='login'?(staff?'gerencia':'cliente'):'')+fields+button(cta))}
     <div class="actions auth-links">${code==='login'?(!production||state.data.accountEmailEnabled?link('/recuperar-senha','Esqueci minha senha','text-button'):'')+(!staff?link((production?'/usuario/cadastro':'/cadastro')+(target?'?voltar='+encodeURIComponent(target):''),'Criar conta','text-button'):''):

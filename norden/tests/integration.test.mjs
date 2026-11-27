@@ -63,6 +63,16 @@ test('páginas e arquivos servidos, catálogo público e política de origem',as
   }
   const pub=(await f.get('boot')).data;
   assert.equal(pub.user,null);assert.equal(pub.catalog.services.length,4);
+  const entry=await f.get('boot?view=entry');
+  assert.equal(entry.status,200);
+  assert.equal(entry.data.entryOnly,true);
+  assert.deepEqual(entry.data.catalog,{info:{}});
+  await f.login(manager);
+  const storefront=await f.get('boot?view=storefront',manager);
+  assert.equal(storefront.status,200);
+  assert.equal(storefront.data.user.role,'gestor');
+  assert.equal(storefront.data.catalog.products.some(product=>Object.hasOwn(product,'physical')),false);
+  assert.equal(Object.hasOwn(storefront.data,'clients'),false);
   assert.equal(pub.catalog.professionals.some(p=>Object.hasOwn(p,'account_id')),false);
   assert.equal(pub.catalog.products.some(p=>Object.hasOwn(p,'reserved')),false);
   assert.equal((await f.post('recover',{email:'john@norden.example'},null,{'Sec-Fetch-Site':'cross-site'})).status,403);

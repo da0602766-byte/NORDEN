@@ -23,13 +23,15 @@ const adminNav=[
   ['/gestao/conteudo','Conteúdo público','grid'],['/gestao/configuracoes','Configurações','menu'],['/gestao/auditoria','Auditoria','shield']
 ];
 const onlyLocal=target=>typeof target==='string' && /^\/(?![\\/])/.test(target) ? target : '';
+const authPaths=['/login','/cadastro','/app/cadastro','/app/entrar','/gestao/entrar','/recuperar-senha','/conta/redefinir','/conta/verificar','/conta/convite'];
+const entryPath=path=>['/app','/gestao',...authPaths].includes(path);
 function popup(message,error=false) {
   clearTimeout(messageTimer);
   toast.innerHTML=`<div class="toast ${error?'error':''}">${icon(error?'cross':'check')}<span>${esc(message)}</span><button class="icon-button" type="button" data-command="dismissToast" aria-label="Fechar aviso">${icon('cross',17)}</button></div>`;
   messageTimer=setTimeout(()=>{toast.innerHTML='';},4500);
 }
-async function load() {
-  state.data=await api('boot');
+async function load(entry=false) {
+  state.data=await api(entry?'boot?view=entry':'boot');
   if(state.data.production) {
     let dark=false;
     try { dark=localStorage.getItem('norden_theme')==='dark'; } catch { /* Use the default theme. */ }
@@ -115,6 +117,7 @@ async function draw(routeChange=false) {
   const allows=isAdmin?user&&user.role!=='cliente':user?.role==='cliente';
   let body,detail;
   try {
+    if(state.data.entryOnly&&!entryPath(path)) await load();
     if((isAdmin||isClient)&&allows&&parts[2]) {
       const kind=parts[1]==='pedidos'?'pedido':['atendimentos','agendamentos','cuidados','jornada'].includes(parts[1])?'reserva':'';
       if(kind) {
@@ -130,7 +133,7 @@ async function draw(routeChange=false) {
     }
     if(stamp!==version) return;
     if(path==='/') body=publicLayout(landing(),true);
-    else if(['/login','/cadastro','/app/cadastro','/app/entrar','/gestao/entrar','/recuperar-senha','/conta/redefinir','/conta/verificar','/conta/convite'].includes(path)) body=publicLayout(authView(path),true);
+    else if(authPaths.includes(path)) body=publicLayout(authView(path),true);
     else if(isAdmin) body=allows?workspace(adminPage(parts,detail),path,true):!user&&state.data.production?publicLayout(authView('/gestao/entrar',liveRoute(path+url.search)),true):publicLayout(gate(path+url.search,true));
     else if(path==='/app'&&!user&&state.data.production) body=publicLayout(authView('/app/entrar'),true);
     else if(isClient) body=allows?workspace(clientPage(parts,detail),path,false):
@@ -241,12 +244,13 @@ function updateGuest(fields,delta) {
 async function importGuest() {
   if(state.data.user?.role!=='cliente') return;
   const guest=guestCart();
-  for(const [productId,delta] of Object.entries(guest)) {
-    try { await action('cartItem',{productId,delta});delete guest[productId]; }
+  const entries=Object.entries(guest);
+  if(!entries.length) return;
+  for(const [productId,delta] of entries) {
+    try { state.data.cart=await action('cartItem',{productId,delta});delete guest[productId]; }
     catch { popup('Um item do carrinho local não estava disponível para a conta.',true); }
   }
   saveCart(guest);
-  await load();
 }
 const direct={
   productPrice:['productPrice','Preço atualizado no catálogo.'],
@@ -281,7 +285,7 @@ async function dispatch(name,form,fields,phase) {
     return;
   }
   if(name==='login'||name==='register'||name==='redeem') {
-    const result=await action(name,fields);
+    await action(name,fields);
     await load();
     await importGuest();
     const target=internalRoute(onlyLocal(fields.target));
@@ -294,7 +298,11 @@ async function dispatch(name,form,fields,phase) {
     if(name==='register') popup(state.data.production?'Conta criada.':'Conta de demonstração criada.');
     return;
   }
-  if(name==='logout') { await action('logout'); await load(); go('/',true);popup('Sessão encerrada.');return; }
+  if(name==='logout') {
+    await action('logout');
+    if(state.data.production) { location.replace('/');return; }
+    await load();go('/',true);popup('Sessão encerrada.');return;
+  }
   if(name==='recover') {
     await action('recover',fields);
     popup(state.data.production?'Se a conta existir, enviaremos um link por e-mail.':'Se a conta existir, o link ficará na caixa de saída local.');
@@ -311,7 +319,7 @@ async function dispatch(name,form,fields,phase) {
   if(name==='wizard') { await booking(form,fields); return; }
   if(name==='cartItem'||name==='addProduct') {
     const auth=state.data.user?.role==='cliente',delta=name==='addProduct';
-    if(auth) { await action('cartItem',{productId:fields.productId,[delta?'delta':'quantity']:fields.quantity}); await load(); }
+    if(auth) state.data.cart=await action('cartItem',{productId:fields.productId,[delta?'delta':'quantity']:fields.quantity});
     else updateGuest(fields,delta);
     if(delta) go('/app/carrinho'); else await draw();
     popup(delta?'Produto adicionado ao carrinho.':'Carrinho atualizado.');
@@ -512,7 +520,7 @@ window.addEventListener('popstate',()=>draw(true));
 async function init() {
   app.setAttribute('aria-busy','true');
   app.innerHTML=loadingView();
-  try { await load(); await draw(true); }
+  try { await load(entryPath(internalRoute(location.pathname.replace(/\/$/,'')||'/'))); await draw(true); }
   catch(error) {
     app.removeAttribute('aria-busy');
     app.innerHTML=`<main class="wrap public-content">${empty('NORDEN indisponível','Verifique a conexão com a instância e tente novamente.',button('Tentar novamente','button primary','data-command="retry"'))}</main>`;

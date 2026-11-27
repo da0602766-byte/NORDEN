@@ -26,20 +26,26 @@ export const sections = body => ({
   instructions:str(body.instructions,'orientações',2500,1), first:str(body.first,'primeiras horas',1600),
   avoid:str(body.avoid,'o que evitar',1600), maintenance:str(body.maintenance,'manutenção',1600)
 });
-export async function publicCatalog(db,full=false) {
-  const services=await db.all('SELECT * FROM services '+(full?'':'WHERE active=1')+' ORDER BY rowid');
-  const professionals=await db.all('SELECT * FROM professionals '+(full?'':'WHERE active=1')+' ORDER BY rowid');
-  const products=(await db.all('SELECT * FROM products '+(full?'':'WHERE active=1')+' ORDER BY rowid')).map(row=>{
+export async function publicCatalog(db,full=false,storefront=false,settingsPromise=db.settings()) {
+  const active=full?'':'WHERE active=1';
+  const [services,professionals,productRows,compatibility,serviceProducts,settings,gallery]=await Promise.all([
+    db.all('SELECT * FROM services '+active+' ORDER BY rowid'),
+    db.all('SELECT * FROM professionals '+active+' ORDER BY rowid'),
+    db.all('SELECT * FROM products '+active+' ORDER BY rowid'),
+    db.all(`SELECT ps.* FROM professional_services ps JOIN services s ON s.id=ps.service_id JOIN professionals p ON p.id=ps.professional_id ${full?'':'WHERE s.active=1 AND p.active=1'}`),
+    db.all(`SELECT sp.* FROM service_products sp JOIN services s ON s.id=sp.service_id JOIN products p ON p.id=sp.product_id ${full?'':'WHERE s.active=1 AND p.active=1'}`),
+    settingsPromise,
+    storefront?[]:db.all('SELECT * FROM gallery '+(full?'':'WHERE authorized=1 AND active=1')+' ORDER BY rowid')
+  ]);
+  const products=productRows.map(row=>{
     const {physical,reserved,threshold,...safe}=row;
     return full ? {...row,available:physical-reserved} : {...safe,available:physical-reserved};
   });
-  const {headline,introduction,address,contact,hoursText,faq,pickup,cancellationHours,leadMinutes,bookingDays,payment,deliveryMax,reviews}=await db.settings();
+  const {headline,introduction,address,contact,hoursText,faq,pickup,cancellationHours,leadMinutes,bookingDays,payment,deliveryMax,reviews}=settings;
   return {
     services,professionals:professionals.map(({account_id,...p})=>full ? {...p,account_id} : p),products,
-    compatibility:await db.all(`SELECT ps.* FROM professional_services ps JOIN services s ON s.id=ps.service_id JOIN professionals p ON p.id=ps.professional_id ${full?'':'WHERE s.active=1 AND p.active=1'}`),
-    serviceProducts:await db.all(`SELECT sp.* FROM service_products sp JOIN services s ON s.id=sp.service_id JOIN products p ON p.id=sp.product_id ${full?'':'WHERE s.active=1 AND p.active=1'}`),
-    gallery:await db.all('SELECT * FROM gallery '+(full?'':'WHERE authorized=1 AND active=1')+' ORDER BY rowid'),
-    reviews:reviews ? await db.all(`SELECT r.rating,r.comment,b.service_name FROM reviews r JOIN bookings b ON b.id=r.booking_id WHERE r.publish_ok=1 AND r.moderation='PUBLICADA' ORDER BY r.updated DESC LIMIT 12`) : [],
+    compatibility,serviceProducts,gallery,
+    reviews:reviews&&!storefront ? await db.all(`SELECT r.rating,r.comment,b.service_name FROM reviews r JOIN bookings b ON b.id=r.booking_id WHERE r.publish_ok=1 AND r.moderation='PUBLICADA' ORDER BY r.updated DESC LIMIT 12`) : [],
     info:{headline,introduction,address,contact,hoursText,faq,pickup,cancellationHours,leadMinutes,bookingDays,payment,deliveryMax,reviews}
   };
 }

@@ -29,16 +29,28 @@ async function validTime(db,{professionalId,clientId,starts,ends,ignore='',setti
 }
 export async function availability(db,query,user) {
   const {serviceId,professionalId,date}=query;
-  dateTime(date);
-  const service=await selectionFor(db,serviceId,professionalId);
-  const working=await db.all('SELECT starts,ends FROM hours WHERE professional_id=? AND day=? ORDER BY starts',professionalId,weekday(date));
-  const settings=await db.settings();
+  const dayStart=dateTime(date),dayEnd=dateTime(addDays(date,1));
+  const clientId=user?.role==='cliente'?user.id:'';
+  const [service,working,settings,busy]=await Promise.all([
+    selectionFor(db,serviceId,professionalId),
+    db.all('SELECT starts,ends FROM hours WHERE professional_id=? AND day=? ORDER BY starts',professionalId??'',weekday(date)),
+    db.settings(),
+    db.all(`SELECT starts,ends FROM blocks WHERE professional_id=? AND starts<? AND ends>?
+      UNION ALL SELECT starts,ends FROM bookings WHERE (professional_id=? OR client_id=?)
+      AND status IN (${occupied}) AND starts<? AND ends>?`,
+      professionalId??'',dayEnd,dayStart,professionalId??'',clientId,dayEnd,dayStart)
+  ]);
   const length=(service.duration+service.padding)*minute;
   const options=[];
-  for (const row of working) {
-    const end=dateTime(date,row.ends);
-    for(let starts=dateTime(date,row.starts);starts+length<=end;starts+=15*minute) {
-      if(await validTime(db,{professionalId,clientId:user?.role==='cliente'?user.id:'',starts,ends:starts+length,settings})) options.push({starts,clock:local(starts).clock});
+  const time=now();
+  if(date<=addDays(local(time).date,settings.bookingDays)) {
+    for (const row of working) {
+      const end=dateTime(date,row.ends);
+      for(let starts=dateTime(date,row.starts);starts+length<=end;starts+=15*minute) {
+        if(starts>=time+settings.leadMinutes*minute && !busy.some(item=>item.starts<starts+length&&item.ends>starts)) {
+          options.push({starts,clock:local(starts).clock});
+        }
+      }
     }
   }
   return {slots:options,duration:service.duration,padding:service.padding,price:service.price};
@@ -126,7 +138,9 @@ async function expire(db) {
   }
 }
 export async function flowView(db,user) {
-  await db.tx(async ()=>await expire(db));
+  if(await db.get("SELECT 1 FROM flow WHERE status='OFERTADA' AND expiry<=? LIMIT 1",now())) {
+    await db.tx(async ()=>await expire(db));
+  }
   if(user.role==='cliente') return {
     offers:await db.all(`SELECT f.*,b.service_name,b.professional_name FROM flow f JOIN bookings b ON b.id=f.booking_id
       WHERE b.client_id=? ORDER BY f.created DESC LIMIT 150`,user.id)

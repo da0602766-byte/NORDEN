@@ -1,13 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Menu, Moon, ShoppingBag, Sun } from 'lucide-react';
 import { MotionConfig } from 'motion/react';
 import { NordenLogo } from './components/NordenLogo';
 import { ASSETS } from './data/seedData';
 import type { AppView, Product, Professional, ServiceItem } from './types';
-import { LandingContent } from './views/LandingView';
-import { StoreContent } from './views/StoreView';
 import './index.css';
+
+const LandingContent = lazy(() => import('./views/LandingView').then(({ LandingContent }) => ({ default: LandingContent })));
+const StoreContent = lazy(() => import('./views/StoreView').then(({ StoreContent }) => ({ default: StoreContent })));
 
 type Catalog = {
   services: { id: string; name: string; category: string; description: string; price: number; duration: number; padding: number; active: number }[];
@@ -94,7 +95,7 @@ function LiveApp() {
 
   useEffect(() => {
     let current = true;
-    api<Boot>('boot').then((result) => {
+    api<Boot>('boot?view=storefront').then((result) => {
       if (!current) return;
       setCart(result.cart ? Object.fromEntries(result.cart.items.map(({ id, quantity }) => [id, quantity])) : guestCart());
       setBoot(result);
@@ -174,8 +175,10 @@ function LiveApp() {
         {!boot && <div className="mx-auto max-w-[1240px] px-4 py-5 sm:px-8" role={loadError ? 'alert' : 'status'}>
           {loadError ? <>Não foi possível carregar o catálogo. <button type="button" className="underline" onClick={() => { setLoadError(false); setRefresh(refresh + 1); }}>Tentar novamente</button></> : 'Carregando catálogo…'}
         </div>}
-        {isStore ? (boot && <StoreContent {...data} {...{ addToCart, cartCount, setCartOpen, startBookingWithService }} />) :
-          <LandingContent {...data} {...{ addToCart, setCartOpen, startBookingWithService }} live setCurrentView={go} switchRole={() => go('client')} />}
+        <Suspense fallback={<p className="mx-auto max-w-[1240px] px-4 py-5 sm:px-8" role="status">Carregando página…</p>}>
+          {isStore ? <StoreContent {...data} loading={!boot} {...{ addToCart, cartCount, setCartOpen, startBookingWithService }} /> :
+            <LandingContent {...data} {...{ addToCart, setCartOpen, startBookingWithService }} live setCurrentView={go} switchRole={() => go('client')} />}
+        </Suspense>
       </main>
       <footer className="border-t border-[var(--border-subtle)] bg-[var(--bg-footer)]">
         <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-5 px-4 py-8 text-sm text-[var(--text-muted)] sm:px-8">

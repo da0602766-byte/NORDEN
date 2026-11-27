@@ -44,28 +44,46 @@ async function bodyOf(request,max=40_000) {
     fail('Formulário inválido.');
   }
 }
-async function boot(db,user) {
-  const data={user:identity(user),catalog:await publicCatalog(db),today:local(now()).date};
-  if(!user) return data;
-  data.bookings=await listBookings(db,user);
-  data.flow=await flowView(db,user);
-  data.notifications=await db.all('SELECT id,title,href,created,read_at FROM notifications WHERE account_id=? ORDER BY created DESC,rowid DESC LIMIT 150',user.id);
-  if(user.role==='cliente') return {...data,journey:await journey(db,user),cart:await cart(db,user),orders:await orders(db,user),addresses:await addresses(db,user),
-    safety:await ownSafety(db,user),privacy:await db.all('SELECT id,kind,state,created FROM privacy_requests WHERE client_id=? ORDER BY created DESC',user.id)};
-  staff(user);
-  const pId=user.professional_id || '-';
-  if(user.role==='profissional') return {...data,clients:await db.all(`SELECT DISTINCT a.id,a.name,a.phone
-    FROM accounts a JOIN bookings b ON b.client_id=a.id WHERE b.professional_id=? AND a.active=1 ORDER BY a.name LIMIT 500`,pId)};
-  return {...data,catalog:await publicCatalog(db,true),orders:await orders(db,user),settings:await db.settings(),
-    clients:await db.all("SELECT id,name,email,phone,preference FROM accounts WHERE role='cliente' AND active=1 ORDER BY name LIMIT 500"),
-    hours:await db.all('SELECT * FROM hours ORDER BY day,starts'),
-    blocks:await db.all('SELECT * FROM blocks WHERE ends>? ORDER BY starts LIMIT 300',now()),
-    movements:await db.all('SELECT m.*,p.name AS product_name,a.name AS actor_name FROM movements m JOIN products p ON p.id=m.product_id LEFT JOIN accounts a ON a.id=m.actor ORDER BY m.at DESC,m.rowid DESC LIMIT 300'),
-    templates:(await db.all('SELECT * FROM templates ORDER BY updated DESC,rowid DESC LIMIT 250')).map(row=>({...row,sections:parse(row.sections)})),
-    audits:await db.all('SELECT g.*,a.name AS actor_name FROM audits g LEFT JOIN accounts a ON a.id=g.actor ORDER BY g.at DESC,g.rowid DESC LIMIT 300'),
-    privacy:await db.all('SELECT p.*,a.name AS client_name FROM privacy_requests p JOIN accounts a ON a.id=p.client_id ORDER BY p.created DESC LIMIT 250'),
-    reviews:await db.all("SELECT r.*,b.service_name FROM reviews r JOIN bookings b ON b.id=r.booking_id WHERE r.publish_ok=1 ORDER BY r.updated DESC LIMIT 150")
+async function boot(db,user,view) {
+  const data={user:identity(user),today:local(now()).date};
+  if(view==='entry'&&!user) return {...data,entryOnly:true,catalog:{info:{}}};
+  if(view==='storefront') {
+    const [catalog,basket]=await Promise.all([publicCatalog(db,false,true),user?.role==='cliente'?cart(db,user):undefined]);
+    return {...data,catalog,cart:basket};
+  }
+  if(!user) return {...data,catalog:await publicCatalog(db)};
+  const full=user.role==='gestor';
+  const settings=db.settings();
+  const flow=flowView(db,user);
+  const fields={
+    catalog:publicCatalog(db,full,false,settings),
+    bookings:listBookings(db,user),
+    flow,
+    notifications:flow.then(()=>db.all('SELECT id,title,href,created,read_at FROM notifications WHERE account_id=? ORDER BY created DESC,rowid DESC LIMIT 150',user.id))
   };
+  if(user.role==='cliente') Object.assign(fields,{
+    journey:journey(db,user),cart:cart(db,user),orders:orders(db,user),addresses:addresses(db,user),
+    safety:ownSafety(db,user),privacy:db.all('SELECT id,kind,state,created FROM privacy_requests WHERE client_id=? ORDER BY created DESC',user.id)
+  });
+  else {
+    staff(user);
+    if(!full) fields.clients=db.all(`SELECT DISTINCT a.id,a.name,a.phone
+      FROM accounts a JOIN bookings b ON b.client_id=a.id WHERE b.professional_id=? AND a.active=1 ORDER BY a.name LIMIT 500`,user.professional_id||'-');
+    else Object.assign(fields,{
+      settings,orders:orders(db,user),
+      clients:db.all("SELECT id,name,email,phone,preference FROM accounts WHERE role='cliente' AND active=1 ORDER BY name LIMIT 500"),
+      hours:db.all('SELECT * FROM hours ORDER BY day,starts'),
+      blocks:db.all('SELECT * FROM blocks WHERE ends>? ORDER BY starts LIMIT 300',now()),
+      movements:db.all('SELECT m.*,p.name AS product_name,a.name AS actor_name FROM movements m JOIN products p ON p.id=m.product_id LEFT JOIN accounts a ON a.id=m.actor ORDER BY m.at DESC,m.rowid DESC LIMIT 300'),
+      templates:Promise.resolve(db.all('SELECT * FROM templates ORDER BY updated DESC,rowid DESC LIMIT 250'))
+        .then(rows=>rows.map(row=>({...row,sections:parse(row.sections)}))),
+      audits:db.all('SELECT g.*,a.name AS actor_name FROM audits g LEFT JOIN accounts a ON a.id=g.actor ORDER BY g.at DESC,g.rowid DESC LIMIT 300'),
+      privacy:db.all('SELECT p.*,a.name AS client_name FROM privacy_requests p JOIN accounts a ON a.id=p.client_id ORDER BY p.created DESC LIMIT 250'),
+      reviews:db.all("SELECT r.*,b.service_name FROM reviews r JOIN bookings b ON b.id=r.booking_id WHERE r.publish_ok=1 ORDER BY r.updated DESC LIMIT 150")
+    });
+  }
+  const values=await Promise.all(Object.values(fields));
+  return {...data,...Object.fromEntries(Object.keys(fields).map((key,index)=>[key,values[index]]))};
 }
 export function createHandler({db,secure=false,outbox,deliver,production=false}={}) {
   const attempts=new Map();
@@ -102,7 +120,7 @@ export function createHandler({db,secure=false,outbox,deliver,production=false}=
         return reply(res,result);
       }
       if(req.method==='GET' && path.startsWith('/api/')) {
-        if(path==='/api/boot') return reply(res,{...await boot(db,user),production,accountEmailEnabled:Boolean(outbox||deliver)});
+        if(path==='/api/boot') return reply(res,{...await boot(db,user,url.searchParams.get('view')),production,accountEmailEnabled:Boolean(outbox||deliver)});
         if(path==='/api/disponibilidade') return reply(res,await availability(db,Object.fromEntries(url.searchParams),user));
         const [, , resource, ref, extra]=path.split('/');
         if(!ref||extra) fail('Registro indisponível.',404);
