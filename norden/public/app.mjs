@@ -28,7 +28,14 @@ function popup(message,error=false) {
   toast.innerHTML=`<div class="toast ${error?'error':''}">${icon(error?'cross':'check')}<span>${esc(message)}</span><button class="icon-button" type="button" data-command="dismissToast" aria-label="Fechar aviso">${icon('cross',17)}</button></div>`;
   messageTimer=setTimeout(()=>{toast.innerHTML='';},4500);
 }
-async function load() { state.data=await api('boot'); }
+async function load() {
+  state.data=await api('boot');
+  if(state.data.production) {
+    let dark=false;
+    try { dark=localStorage.getItem('norden_theme')==='dark'; } catch { /* Use the default theme. */ }
+    document.documentElement.classList.toggle('portal-light',!dark);
+  }
+}
 try {
   const d=JSON.parse(sessionStorage.getItem(bookingKey)??'null');
   if(d) state.draft={...d,slots:null,step:Math.min(d.step,4)};
@@ -57,6 +64,10 @@ let observerByPage;
 function go(url,replace=false) {
   const safe=liveRoute(onlyLocal(url));
   if(!safe) return;
+  if(state.data.production&&['/','/loja'].includes(new URL(safe,location.origin).pathname)) {
+    location[replace?'replace':'assign'](safe);
+    return;
+  }
   history[replace?'replaceState':'pushState'](null,'',safe);
   draw(true);
 }

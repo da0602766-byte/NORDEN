@@ -4,17 +4,16 @@ import { Search, Plus, Minus, X, ArrowRight, ShoppingBag } from 'lucide-react';
 import { useNorden } from '../context/NordenContext';
 import { SafeImage } from '../components/SafeImage';
 import { formatBRL, getAvailableStock } from '../utils/format';
-import type { Product, ProductCategory } from '../types';
+import type { Product } from '../types';
 
-const CATEGORIES: Array<'Todos' | ProductCategory> = [
-  'Todos',
-  'Cabelo',
-  'Barba',
-  'Pele',
-  'Acessórios',
-];
+type StoreProps = Pick<ReturnType<typeof useNorden>, 'products' | 'services' | 'setCartOpen' | 'cartCount' | 'startBookingWithService'> & {
+  addToCart: (id: string, quantity?: number) => boolean | Promise<boolean>;
+  deliverySettings?: ReturnType<typeof useNorden>['deliverySettings'];
+};
 
-export const StoreView: React.FC = () => {
+export const StoreView: React.FC = () => <StoreContent {...useNorden()} />;
+
+export const StoreContent: React.FC<StoreProps> = (props) => {
   const {
     products,
     services,
@@ -23,10 +22,10 @@ export const StoreView: React.FC = () => {
     cartCount,
     startBookingWithService,
     deliverySettings,
-  } = useNorden();
+  } = props;
 
   const [search, setSearch] = useState('');
-  const [category, setCategory] = useState<'Todos' | ProductCategory>('Todos');
+  const [category, setCategory] = useState('Todos');
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc'>('featured');
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [modalQty, setModalQty] = useState(1);
@@ -66,13 +65,13 @@ export const StoreView: React.FC = () => {
       <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6 pb-8 sm:pb-10 border-b border-[var(--border-subtle)]">
         <div className="max-w-2xl">
           <p className="text-xs tracking-[0.22em] text-[var(--accent)] font-semibold uppercase mb-2.5">
-            NORDEN Store · Catálogo Oficial Demo
+            NORDEN Store{deliverySettings ? ' · Demonstração' : ''}
           </p>
           <h1 className="font-display text-3xl sm:text-5xl font-semibold tracking-tight text-[var(--text-primary)]">
             Fórmulas de precisão e objetos de bancada.
           </h1>
           <p className="mt-3.5 text-sm sm:text-base text-[var(--text-muted)] leading-relaxed">
-            Os mesmos itens aplicados pelos nossos especialistas, com retirada gratuita no salão ou entrega estimada a {formatBRL(deliverySettings.rateCentsPerKm)}/km.
+            Retire no salão ou consulte o valor da entrega na sacola.
           </p>
         </div>
 
@@ -121,7 +120,7 @@ export const StoreView: React.FC = () => {
       {/* Filter & Search Toolbar */}
       <div className="py-6 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-          {CATEGORIES.map((cat) => (
+          {['Todos', ...new Set(products.filter((product) => product.active).map((product) => product.category))].map((cat) => (
             <button
               key={cat}
               type="button"
@@ -456,8 +455,8 @@ export const StoreView: React.FC = () => {
                           <button
                             type="button"
                             disabled={available === 0}
-                            onClick={() => {
-                              if (addToCart(liveProduct.id, modalQty)) {
+                            onClick={async () => {
+                              if (await addToCart(liveProduct.id, modalQty)) {
                                 setSelectedProduct(null);
                                 setCartOpen(true);
                               }

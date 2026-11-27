@@ -15,20 +15,20 @@ import type {
 } from '../types';
 
 export const ASSETS = {
-  heroSalon: './assets/images/hero_norden_salon.webp',
-  ritualPrecisionCut: './assets/images/ritual_precision_cut.webp',
-  ritualHotTowel: './assets/images/ritual_hot_towel_beard.webp',
-  barberRafael: './assets/images/barber_rafael_portrait.webp',
-  barberHenrique: './assets/images/barber_henrique_portrait.webp',
-  productClay: './assets/images/product_matte_clay.webp',
-  productBeardOil: './assets/images/product_beard_elixir.webp',
-  productCleanser: './assets/images/product_cleanser_kit.webp',
-  productTools: './assets/images/product_grooming_tools.webp',
-  transformLucasBefore: './assets/images/transform_hair_before.webp',
-  transformLucasAfter: './assets/images/transform_lucas_after.webp',
-  transformBeardBefore: './assets/images/transform_beard_before.webp',
-  transformBeardAfter: './assets/images/transform_beard_after.webp',
-  transformFadeAfter: './assets/images/transform_hair_after.webp',
+  heroSalon: import.meta.env.BASE_URL + 'assets/images/hero_norden_salon.webp',
+  ritualPrecisionCut: import.meta.env.BASE_URL + 'assets/images/ritual_precision_cut.webp',
+  ritualHotTowel: import.meta.env.BASE_URL + 'assets/images/ritual_hot_towel_beard.webp',
+  barberRafael: import.meta.env.BASE_URL + 'assets/images/barber_rafael_portrait.webp',
+  barberHenrique: import.meta.env.BASE_URL + 'assets/images/barber_henrique_portrait.webp',
+  productClay: import.meta.env.BASE_URL + 'assets/images/product_matte_clay.webp',
+  productBeardOil: import.meta.env.BASE_URL + 'assets/images/product_beard_elixir.webp',
+  productCleanser: import.meta.env.BASE_URL + 'assets/images/product_cleanser_kit.webp',
+  productTools: import.meta.env.BASE_URL + 'assets/images/product_grooming_tools.webp',
+  transformLucasBefore: import.meta.env.BASE_URL + 'assets/images/transform_hair_before.webp',
+  transformLucasAfter: import.meta.env.BASE_URL + 'assets/images/transform_lucas_after.webp',
+  transformBeardBefore: import.meta.env.BASE_URL + 'assets/images/transform_beard_before.webp',
+  transformBeardAfter: import.meta.env.BASE_URL + 'assets/images/transform_beard_after.webp',
+  transformFadeAfter: import.meta.env.BASE_URL + 'assets/images/transform_hair_after.webp',
 } as const;
 
 export const INITIAL_DELIVERY_SETTINGS: DeliverySettings = {

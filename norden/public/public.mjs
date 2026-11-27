@@ -7,7 +7,7 @@ export function header() {
   return `<header class="site-header"><div class="wrap nav-bar">
     ${brand()}<button type="button" class="icon-button mobile-menu" data-command="menu" aria-label="Abrir navegação" aria-expanded="false">${icon('menu')}</button>
     <nav class="public-nav" aria-label="Navegação principal">
-      ${link('/servicos','Serviços','nav-link')}${link('/#experiencia','Experiência','nav-link')}${link('/profissionais','Profissionais','nav-link')}${link('/loja','Loja','nav-link')}
+      ${link('/servicos','Serviços','nav-link')}${link(state.data.production?'/#linha-do-tempo':'/#experiencia','Experiência','nav-link')}${link('/profissionais','Profissionais','nav-link')}${link('/loja','Loja','nav-link')}
       ${state.data.production?link('/usuario','Área do cliente','nav-link')+link('/gerencia','Gerência','nav-link')+(!state.data.user?link('/usuario/cadastro','Criar conta','nav-link signup-nav'):''):''}
     </nav><div class="nav-actions">
       ${link(state.data.production&&!state.data.user?'/usuario/entrar':accountHome(),state.data.user?'Minha área':'Entrar','nav-link account-link','user')}

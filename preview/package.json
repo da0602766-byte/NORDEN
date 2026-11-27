@@ -8,6 +8,7 @@
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build": "vite build",
+    "build:live": "vite build --mode live --outDir ../norden/dist/public/vitrine --emptyOutDir",
     "build:pages": "vite build --outDir ../docs --emptyOutDir",
     "preview": "vite preview"
   },

@@ -95,7 +95,14 @@ const FAQ_ITEMS = [
   },
 ];
 
-export const LandingView: React.FC = () => {
+type LandingProps = Pick<ReturnType<typeof useNorden>, 'services' | 'professionals' | 'products' | 'startBookingWithService' | 'setCurrentView' | 'setCartOpen' | 'switchRole'> & {
+  addToCart: (id: string, quantity?: number) => boolean | Promise<boolean>;
+  live?: boolean;
+};
+
+export const LandingView: React.FC = () => <LandingContent {...useNorden()} />;
+
+export const LandingContent: React.FC<LandingProps> = (props) => {
   const {
     services,
     professionals,
@@ -105,7 +112,8 @@ export const LandingView: React.FC = () => {
     addToCart,
     setCartOpen,
     switchRole,
-  } = useNorden();
+    live,
+  } = props;
 
   // Continuous living Hero scene cycle
   const [heroIndex, setHeroIndex] = useState(0);
@@ -479,8 +487,8 @@ export const LandingView: React.FC = () => {
                             <button
                               key={prod.id}
                               type="button"
-                              onClick={() => {
-                                if (addToCart(prod.id, 1)) setCartOpen(true);
+                              onClick={async () => {
+                                if (await addToCart(prod.id, 1)) setCartOpen(true);
                               }}
                               className="rounded-sm bg-[var(--accent)]/12 text-[var(--text-primary)] font-semibold ring-2 ring-[var(--accent)]/12 hover:bg-[var(--accent)]/25 underline decoration-[var(--accent)] underline-offset-4 transition-colors cursor-pointer"
                             >
@@ -611,8 +619,8 @@ export const LandingView: React.FC = () => {
                           <button
                             type="button"
                             disabled={avail === 0}
-                            onClick={() => {
-                              if (addToCart(prod.id, 1)) setCartOpen(true);
+                            onClick={async () => {
+                              if (await addToCart(prod.id, 1)) setCartOpen(true);
                             }}
                             className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] hover:text-[var(--accent)] cursor-pointer"
                           >
@@ -799,8 +807,8 @@ export const LandingView: React.FC = () => {
                                 </p>
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    if (addToCart(prod.id, 1)) setCartOpen(true);
+                                  onClick={async () => {
+                                    if (await addToCart(prod.id, 1)) setCartOpen(true);
                                   }}
                                   className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold text-[var(--accent-fg)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-md transition-colors cursor-pointer"
                                 >
@@ -946,8 +954,8 @@ export const LandingView: React.FC = () => {
                     <button
                       type="button"
                       disabled={available === 0}
-                      onClick={() => {
-                        if (addToCart(product.id, 1)) {
+                      onClick={async () => {
+                        if (await addToCart(product.id, 1)) {
                           setCartOpen(true);
                         }
                       }}
@@ -965,7 +973,7 @@ export const LandingView: React.FC = () => {
       </section>
 
       {/* 6. SPECIALISTS SECTION */}
-      <section className="border-t border-[var(--border-subtle)] bg-[var(--bg-band)] transition-colors duration-200">
+      {professionals.length > 0 && <section className="border-t border-[var(--border-subtle)] bg-[var(--bg-band)] transition-colors duration-200">
         <div className="max-w-[1240px] mx-auto px-4 sm:px-8 py-16 sm:py-24">
           <div className="max-w-xl mb-12">
             <p className="text-xs tracking-[0.22em] text-[var(--accent)] font-semibold uppercase mb-2.5">
@@ -1008,9 +1016,9 @@ export const LandingView: React.FC = () => {
                   </div>
 
                   <div className="pt-4 border-t border-[var(--border-subtle)] flex items-center justify-between gap-2">
-                    <span className="text-xs text-[var(--text-muted)] font-mono tabular-nums">
+                    {prof.experienceYears !== undefined && <span className="text-xs text-[var(--text-muted)] font-mono tabular-nums">
                       {prof.experienceYears} anos de experiência
-                    </span>
+                    </span>}
                     <button
                       type="button"
                       onClick={() => startBookingWithService(null, prof.id)}
@@ -1025,7 +1033,7 @@ export const LandingView: React.FC = () => {
             ))}
           </div>
         </div>
-      </section>
+      </section>}
 
       {/* 7. FINAL CLIENT CONVERSION BANNER + FAQ */}
       <section className="max-w-[960px] mx-auto px-4 sm:px-8 pt-16 sm:pt-20 pb-8 space-y-16">
@@ -1093,7 +1101,9 @@ export const LandingView: React.FC = () => {
                   </button>
                   {isOpen && (
                     <p className="pb-5 text-sm text-[var(--text-muted)] leading-relaxed max-w-2xl">
-                      {item.a}
+                      {live && idx === 1
+                        ? 'Quando um produto usado no atendimento estiver na loja, você pode adicioná-lo à sacola e consultar as opções de retirada ou entrega.'
+                        : item.a}
                     </p>
                   )}
                 </div>

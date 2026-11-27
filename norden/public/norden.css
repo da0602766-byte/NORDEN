@@ -143,3 +143,38 @@ h2 {font-size:clamp(1.5rem,2.5vw,2.4rem)}
 .auth-image {overflow:hidden; position:relative; min-height:22rem;}
 .auth-image img {position:absolute; inset:0; width:100%; height:100%; max-height:none; object-fit:cover;}
 @media(max-width:720px) {.auth-image {min-height:0; aspect-ratio:2.4;}.auth-image img {max-height:none;width:100%;}}
+
+.portal-light {
+  color-scheme:light;
+  --paper:#f5f2ec; --panel:#fff; --ink:#141417; --muted:#5f564d;
+  --edge:#ddd6cc; --sand:#8e6b47; --accent-ink:#765636;
+  --sans:"DM Sans","Segoe UI",sans-serif; --serif:"Outfit","Segoe UI",sans-serif;
+}
+.portal-light h1,.portal-light h2,.portal-light h3,.portal-light h4 {font-family:var(--serif)}
+.portal-light .site-header,.portal-light .workspace-header,.portal-light .mobile-tabs {
+  background:#f5f2ecf5;color:var(--ink);border-color:var(--edge);
+}
+.portal-light .site-header .nav-bar {min-height:4rem}
+.portal-light .site-header .icon-button,.portal-light .site-header .nav-link {color:var(--ink)}
+.portal-light .sidebar,.portal-light .site-footer {background:#ece7df;color:var(--ink)}
+.portal-light .site-footer .nav-link,.portal-light .sidebar .side-link,.portal-light .mobile-tabs .side-link {color:var(--ink)}
+.portal-light .brand-sub {display:none}
+.portal-light .brand-image {width:1.8rem;height:2.4rem}
+.portal-light .brand .wordmark {font-family:var(--serif);font-size:1.15rem}
+.portal-light .button.primary {background:#8e6b47;border-color:#8e6b47;color:#fff}
+.portal-light .button.primary:hover {background:#765636;border-color:#765636}
+.portal-light .button.outline:hover,.portal-light .utility:hover,
+.portal-light .option:has(input:checked),.portal-light .slot:has(input:checked),.portal-light .metrics a:hover {background:#ece7df;color:var(--ink)}
+.portal-light .field input,.portal-light .field select,.portal-light .field textarea,.portal-light .invite-link {background:#faf8f5;color:var(--ink)}
+.portal-light .panel,.portal-light .journey-session,.portal-light .product-card {background:var(--panel);box-shadow:0 10px 28px -12px #14141720}
+.portal-light .journey-overview,.portal-light .session-products>section,.portal-light .mini-product {background:#f1ece4}
+.portal-light .session-summary {color:var(--ink)}
+.portal-light .banner,.portal-light .form-error {background:#efe4d7;color:var(--ink)}
+.portal-light .banner.error,.portal-light .form-error {background:#fbe7e4;color:#801e17}
+.portal-light .auth-layout {
+  width:var(--wrap);margin:clamp(1rem,4vw,3rem) auto;
+  border:1px solid var(--edge);border-radius:1rem;overflow:hidden;background:var(--panel);
+}
+@media(max-width:960px) {
+  .portal-light .public-nav {background:var(--panel);color:var(--ink);border-color:var(--edge)}
+}

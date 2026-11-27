@@ -24,7 +24,7 @@ export interface Professional {
   specialties: string[];
   serviceIds: string[];
   image: string;
-  experienceYears: number;
+  experienceYears?: number;
   active: boolean;
 }
 
@@ -32,7 +32,7 @@ export interface ServiceItem {
   id: string;
   slug: string;
   name: string;
-  category: 'Cabelo' | 'Barba' | 'Ritual Completo' | 'Terapia';
+  category: string;
   description: string;
   clientBenefit?: string;
   image?: string;
@@ -53,7 +53,7 @@ export interface Product {
   sku: string;
   name: string;
   brand: string;
-  category: ProductCategory;
+  category: string;
   volume: string;
   priceCents: number;
   promoPriceCents?: number;
