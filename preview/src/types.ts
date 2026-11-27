@@ -70,6 +70,10 @@ export interface Product {
   featured?: boolean;
 }
 
+export type StorefrontProduct = Product | (
+  Omit<Product, 'physicalStock' | 'reservedStock' | 'minStockAlert'> & { availableStock: number }
+);
+
 export type BookingStatus =
   | 'PENDENTE'
   | 'CONFIRMADO'

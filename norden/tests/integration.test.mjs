@@ -10,12 +10,12 @@ import { seed,demoAccounts } from '../src/seed.mjs';
 const pass='Norden-fixture-2026';
 const client='demo-cliente',other='demo-cliente-2',manager='demo-gestor',staff='demo-profissional';
 const address={zip:'00000-000',street:'Rua Fictícia',number:'10',district:'Bairro Exemplo',city:'Cidade Exemplo',state:'SC'};
-async function fixture(t) {
+async function fixture(t, mail) {
   const folder=mkdtempSync(join(tmpdir(),'norden-test-'));
   const path=join(folder,'db.sqlite'),outbox=join(folder,'outbox');
   const db=process.env.NORDEN_TEST_POSTGRES==='1'?(await (await import('./postgres-fixture.mjs')).testPostgres()).db:openDatabase(path);
   await seed(db,pass);
-  const server=createServer({db,outbox});
+  const server=createServer({db,outbox,...mail});
   await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
   t.after(async()=>{await new Promise(resolve=>server.close(resolve));await db.close();rmSync(folder,{recursive:true,force:true});});
   const endpoint='http://127.0.0.1:'+server.address().port;
@@ -70,12 +70,15 @@ test('páginas e arquivos servidos, catálogo público e política de origem',as
   await f.login(manager);
   const storefront=await f.get('boot?view=storefront',manager);
   assert.equal(storefront.status,200);
-  assert.equal(storefront.data.user.role,'gestor');
+  assert.deepEqual(storefront.data.user,{role:'gestor'});
   assert.equal(storefront.data.catalog.products.some(product=>Object.hasOwn(product,'physical')),false);
   assert.equal(Object.hasOwn(storefront.data,'clients'),false);
   assert.equal(pub.catalog.professionals.some(p=>Object.hasOwn(p,'account_id')),false);
   assert.equal(pub.catalog.products.some(p=>Object.hasOwn(p,'reserved')),false);
   assert.equal((await f.post('recover',{email:'john@norden.example'},null,{'Sec-Fetch-Site':'cross-site'})).status,403);
+  assert.equal((await f.post('recover',{email:'john@norden.example'},null,{Origin:'https://portal.example'})).status,403);
+  assert.equal((await f.post('recover',{email:'john@norden.example'},null,{'Content-Type':'text/plain'})).status,403);
+  assert.equal((await f.request('/usuario/checkout')).headers.get('x-robots-tag'),'noindex');
 });
 test('portais validam o papel e só gestores alteram o preço publicado',async t=>{
   const f=await fixture(t);
@@ -114,6 +117,29 @@ test('cadastro cria só cliente, recuperação expira após uso e encerra sessõ
   await f.act('reset',body,null,410);
   assert.equal((await f.get('boot','test')).data.user,null);
   assert.equal((await f.post('login',{email,password:body.password})).status,200);
+});
+test('recuperação indisponível é uniforme e cadastro continua sem SMTP',async t=>{
+  const f=await fixture(t,{outbox:undefined,production:true});
+  assert.equal((await f.get('boot?view=entry')).data.accountEmailEnabled,false);
+  const responses=await Promise.all(['cliente@norden.example','desconhecido@norden.example'].map(email=>f.post('recover',{email})));
+  assert.equal(responses[0].status,503);
+  assert.equal(responses[1].status,503);
+  assert.deepEqual(responses[0].data,responses[1].data);
+  const result=await f.post('register',{email:'novo@norden.example',password:pass,confirm:pass,name:'Cliente Fictício',phone:'00000000000'});
+  assert.equal(result.status,200);
+  assert.match(result.cookie,/HttpOnly/);
+});
+test('falha de envio preserva o cadastro e o retorno neutro de recuperação',async t=>{
+  const f=await fixture(t,{outbox:undefined,deliver:async()=>{throw new Error('Falha de teste');}});
+  const result=await f.post('register',{email:'novo@norden.example',password:pass,confirm:pass,name:'Cliente Fictício',phone:'00000000000'});
+  assert.equal(result.status,200);
+  assert.equal(result.data.verificationFailed,true);
+  f.sessions.registered=result.cookie.split(';')[0];
+  await f.act('resend',{},'registered',503);
+  const responses=await Promise.all(['novo@norden.example','desconhecido@norden.example'].map(email=>f.post('recover',{email})));
+  assert.deepEqual(responses.map(({status,data})=>({status,data})),[
+    {status:200,data:{ok:true}},{status:200,data:{ok:true}}
+  ]);
 });
 test('autorização por registro, por papel e dados sensíveis cifrados',async t=>{
   const f=await fixture(t);
@@ -164,9 +190,30 @@ test('bloqueio, preço alterado, inatividade e horários passados são revalidad
   await f.act('block',{professionalId:'andre',startDate:b.date,endDate:b.date,startClock:'10:00',endClock:'11:00',reason:'Folga fictícia'},manager);
   await f.act('book',b,client,409);
   await f.act('book',{...b,clock:'11:00',price:1},client,409);
+  await f.act('book',{...b,clock:'11:00',duration:46,padding:0},client,409);
+  await f.act('book',{...b,clock:'11:00',duration:45,padding:10},client,409);
   await f.act('book',{...b,date:addDays(local(now()).date,-2)},client,409);
   await f.db.run("UPDATE professionals SET active=0 WHERE id='andre'");
   await f.act('book',{...b,clock:'11:00'},client,409);
+  await f.db.run("UPDATE professionals SET active=0");
+  assert.deepEqual((await f.get('boot?view=storefront')).data.catalog.professionals,[]);
+});
+test('gestor configura equipe, serviço e expediente com pausa',async t=>{
+  const f=await fixture(t);await f.login(manager);
+  const data={name:'Profissional Fictício',specialty:'Cortes',description:'Conta de teste',services:['corte'],active:false};
+  const {id}=await f.act('professional',data,manager);
+  const date=workingDay(),day=weekday(date);
+  const query='disponibilidade?'+new URLSearchParams({serviceId:'corte',professionalId:id,date});
+  assert.equal((await f.get(query)).status,409);
+  await f.act('professional',{...data,id,active:true},manager);
+  assert.deepEqual((await f.get(query)).data.slots,[]);
+  const hours=[{day,start:'09:00',end:'11:30'},{day,start:'13:00',end:'16:00'}];
+  await f.act('hours',{professionalId:id,hours},manager);
+  await f.act('hours',{professionalId:id,hours:[...hours,{day,start:'10:00',end:'12:00'}]},manager,400);
+  const {slots,duration}=(await f.get(query)).data;
+  assert.equal(duration,45);
+  assert.ok(slots.some(slot=>slot.clock==='13:00'));
+  assert.ok(slots.every(slot=>slot.clock<'11:00'||slot.clock>='13:00'));
 });
 test('Flow sugere encaixe de 45, exclui 90 e confirma troca com histórico',async t=>{
   const f=await fixture(t);await Promise.all([f.login(client),f.login(manager)]);
@@ -191,6 +238,35 @@ for(const outcome of ['recusa','expiração','ocupação']) test('Flow preserva 
   const result=await f.act('answer',{id:offer.id,decision:outcome==='recusa'?'recusar':'aceitar'},client);
   assert.equal(result.status,outcome==='recusa'?'RECUSADA':'EXPIRADA');
   assert.equal((await f.db.get("SELECT starts FROM bookings WHERE id='demo-candidato'")).starts,old);
+});
+test('cookies HTTPS, logout e expiração interrompem a sessão',async t=>{
+  const f=await fixture(t,{secure:true});
+  const body={email:'cliente@norden.example',password:pass};
+  await f.act('login',{...body,password:'Senha incorreta'},null,401);
+  const logged=await f.post('login',body);
+  assert.equal(logged.status,200);
+  assert.match(logged.cookie,/HttpOnly; SameSite=Lax; Max-Age=1209600; Secure/);
+  f.sessions.session=logged.cookie.split(';')[0];
+  const logout=await f.post('logout',{},'session');
+  assert.match(logout.cookie,/Max-Age=0; Secure/);
+  assert.equal((await f.get('boot','session')).data.user,null);
+  const active=await f.post('login',body);
+  f.sessions.session=active.cookie.split(';')[0];
+  await f.db.run('UPDATE sessions SET expiry=?',now()-1);
+  await f.act('cartItem',{productId:'pomada',delta:1},'session',401);
+});
+test('sessões não aceitam links de verificação ou recuperação vencidos',async t=>{
+  const f=await fixture(t);
+  const email='expirado@norden.example';
+  await f.act('register',{email,password:pass,confirm:pass,name:'Cliente Fictício',phone:'00000000000'});
+  await f.act('recover',{email});
+  await f.db.run('UPDATE tokens SET expiry=?',now()-1);
+  const issued=readdirSync(f.outbox).map(file=>JSON.parse(readFileSync(join(f.outbox,file),'utf8')));
+  for(const [purpose,command] of [['verificar','verify'],['redefinir','reset']]) {
+    const {path}=issued.find(item=>item.purpose===purpose);
+    const token=new URL(path,'http://localhost').searchParams.get('token');
+    await f.act(command,{token,password:pass,confirm:pass},null,410);
+  }
 });
 test('atendimento concluído uma vez, Journey e Care congelados, notas restritas',async t=>{
   const f=await fixture(t);
@@ -219,10 +295,14 @@ test('fotos privadas exigem autorização e respeitam a propriedade da reserva',
   const payload={id:'demo-historico',kind:'Depois',image,authorized:true};
   await f.act('photo',payload,manager,403);
   await f.act('profile',{name:'Cliente de Teste',phone:'00000000000',photoOk:true,moveOk:true},client);
+  await f.act('photo',{...payload,image:'data:image/webp;base64,AA=='},manager,400);
   const p=await f.act('photo',payload,manager);
+  assert.equal((await f.get('foto/'+p.id,manager)).status,200);
+  assert.equal((await f.db.get("SELECT COUNT(*) n FROM audits WHERE action='FOTO_PRIVADA_CONSULTADA'")).n,1);
   assert.equal((await f.get('foto/'+p.id,client)).headers.get('content-type'),'image/png');
   assert.equal((await f.get('foto/'+p.id,other)).status,404);
   assert.equal((await f.get('foto/'+p.id)).status,401);
+  assert.equal((await f.get('foto/inexistente')).status,401);
 });
 test('carrinho, entrega estimada, preço alterado e pedido idempotente',async t=>{
   const f=await fixture(t);await Promise.all([f.login(client),f.login(other),f.login(manager)]);
@@ -248,6 +328,33 @@ test('carrinho, entrega estimada, preço alterado e pedido idempotente',async t=
   await f.act('orderState',{id:result.id,state:'SAIU_ENTREGA'},manager);
   assert.deepEqual(Object.values(await f.db.get("SELECT physical,reserved FROM products WHERE id='pomada'")),[17,0]);
   await f.act('orderState',{id:result.id,state:'CONCLUIDO'},manager);
+});
+test('retomada da transferência não duplica unidades na sacola',async t=>{
+  const f=await fixture(t);
+  await f.login(client);
+  await f.act('cartItem',{productId:'pomada',delta:1},client);
+  const transfer={productId:'pomada',transferQuantity:3};
+  const results=await Promise.all([f.act('cartItem',transfer,client),f.act('cartItem',transfer,client)]);
+  for(const basket of results) assert.equal(basket.items.find(item=>item.id==='pomada').quantity,3);
+  await f.act('cartItem',{productId:'pomada',delta:1},client);
+  const replay=await f.act('cartItem',transfer,client);
+  assert.equal(replay.items.find(item=>item.id==='pomada').quantity,4);
+});
+test('modo hospedado preserva pagamento presencial e o mesmo identificador no reenvio',async t=>{
+  const f=await fixture(t,{production:true});
+  await f.login(client);
+  await f.act('cartItem',{productId:'pomada',delta:1},client);
+  await f.act('quote',delivery({distance:'4e0'}),client,400);
+  const quote=await f.act('quote',delivery({distance:'4,25'}),client);
+  assert.equal(quote.fee,1063);
+  assert.equal(quote.payment,'presencial');
+  assert.equal((await f.get('boot',client)).data.catalog.info.payment,'presencial');
+  const order={...delivery({distance:'4,25'}),quoteKey:quote.key,requestKey:'reenvio-ficticio-hospedado'};
+  const results=await Promise.all([f.act('checkout',order,client),f.act('checkout',order,client)]);
+  assert.equal(results[0].id,results[1].id);
+  const detail=(await f.get('pedido/'+results[0].id,client)).data;
+  assert.equal(detail.financial,'NAO_PAGO');
+  assert.equal(detail.quote.estimated,true);
 });
 test('última unidade concorrente, retirada, cancelamento idempotente e baixa',async t=>{
   const f=await fixture(t);await Promise.all([f.login(client),f.login(other),f.login(manager)]);

@@ -515,7 +515,6 @@ export const ClientHubView: React.FC = () => {
                         beforeLabel="Antes"
                         afterLabel="Depois"
                         altSubject={`${selectedJourney.clientName} — ${selectedJourney.serviceName}`}
-                        autoAnimate={true}
                       />
                     </div>
                     <div className="md:col-span-6 space-y-3">

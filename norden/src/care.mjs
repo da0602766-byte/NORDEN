@@ -88,24 +88,27 @@ async function persist(db,body,user,type) {
   });
 }
 export async function readMedia(db,key,user) {
+  if(!user) fail('Acesse sua conta.',401);
   const media=await db.get('SELECT * FROM appointment_media WHERE id=?',key ?? '');
   if(!media) fail('Imagem indisponível.',404);
   const b=await bookingFor(db,media.booking_id,user);
   if(user.role==='cliente' && b.status!=='CONCLUIDO') fail('Imagem indisponível.',404);
+  if(user.role!=='cliente') await audit(db,user.id,'FOTO_PRIVADA_CONSULTADA','reserva',b.id);
   return media;
 }
 function mediaContent(value) {
   if(typeof value!=='string'||value.length>2_800_000) fail('Use uma foto de até 2 MB.');
   const match=/^data:(image\/(?:jpeg|png|webp));base64,([a-z0-9+/=\r\n]+)$/i.exec(value);
   if(!match) fail('Envie uma imagem JPEG, PNG ou WebP.');
+  const mime=match[1].toLowerCase();
   const content=Buffer.from(match[2],'base64');
   const verified={
     'image/jpeg':content[0]===255 && content[1]===216 && content[2]===255,
     'image/png':content.subarray(0,8).equals(Buffer.from([137,80,78,71,13,10,26,10])),
     'image/webp':content.toString('ascii',0,4)==='RIFF'&&content.toString('ascii',8,12)==='WEBP'
-  }[match[1]];
+  }[mime];
   if(!verified||content.length>2*1024*1024) fail('Imagem inválida ou acima do limite.');
-  return {content,mime:match[1]};
+  return {content,mime};
 }
 export const careActions = {
   async start(db,body,user) {

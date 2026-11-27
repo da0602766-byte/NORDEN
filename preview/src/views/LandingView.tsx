@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowRight,
@@ -13,7 +13,8 @@ import { useNorden } from '../context/NordenContext';
 import { ASSETS, INITIAL_COMPLETED_APPOINTMENTS } from '../data/seedData';
 import { SafeImage } from '../components/SafeImage';
 import { BeforeAfterSlider } from '../components/BeforeAfterSlider';
-import { formatBRL, formatDateBR, getAvailableStock } from '../utils/format';
+import type { StorefrontProduct } from '../types';
+import { formatBRL, formatDateBR, storefrontStock } from '../utils/format';
 
 const HERO_SCENES = [
   {
@@ -95,7 +96,9 @@ const FAQ_ITEMS = [
   },
 ];
 
-type LandingProps = Pick<ReturnType<typeof useNorden>, 'services' | 'professionals' | 'products' | 'startBookingWithService' | 'setCurrentView' | 'setCartOpen' | 'switchRole'> & {
+type LandingProps = Pick<ReturnType<typeof useNorden>, 'services' | 'professionals' | 'startBookingWithService' | 'setCurrentView' | 'setCartOpen' | 'switchRole'> & {
+  products: StorefrontProduct[];
+  addingId?: string | null;
   addToCart: (id: string, quantity?: number) => boolean | Promise<boolean>;
   live?: boolean;
 };
@@ -110,18 +113,58 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
     startBookingWithService,
     setCurrentView,
     addToCart,
+    addingId,
     setCartOpen,
     switchRole,
     live,
   } = props;
 
-  // Continuous living Hero scene cycle
   const [heroIndex, setHeroIndex] = useState(0);
+  const [rotationPaused, setRotationPaused] = useState(false);
+  const [heroHovered, setHeroHovered] = useState(false);
+  const [heroFocused, setHeroFocused] = useState(false);
+  const [heroVisible, setHeroVisible] = useState(false);
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  const [reduceMotion, setReduceMotion] = useState(() => matchMedia('(prefers-reduced-motion: reduce)').matches);
+  const hero = useRef<HTMLElement>(null);
+
   useEffect(() => {
-    const timer = window.setInterval(() => {
-      setHeroIndex((prev) => (prev + 1) % HERO_SCENES.length);
-    }, 5200);
-    return () => window.clearInterval(timer);
+    const motionPreference = matchMedia('(prefers-reduced-motion: reduce)');
+    const updateMotion = () => setReduceMotion(motionPreference.matches);
+    const updateVisibility = () => setPageVisible(!document.hidden);
+    motionPreference.addEventListener('change', updateMotion);
+    document.addEventListener('visibilitychange', updateVisibility);
+    const observer = new IntersectionObserver(([entry]) => setHeroVisible(entry.isIntersecting), { threshold: 0.15 });
+    if (hero.current) observer.observe(hero.current);
+    return () => {
+      observer.disconnect();
+      motionPreference.removeEventListener('change', updateMotion);
+      document.removeEventListener('visibilitychange', updateVisibility);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion || rotationPaused || heroFocused || heroHovered || !heroVisible || !pageVisible) return;
+    const timer = window.setTimeout(() => setHeroIndex((index) => (index + 1) % HERO_SCENES.length), 5200);
+    return () => window.clearTimeout(timer);
+  }, [heroIndex, reduceMotion, rotationPaused, heroFocused, heroHovered, heroVisible, pageVisible]);
+
+  const gallery = useRef<HTMLDivElement>(null);
+  const [visibleFrames, setVisibleFrames] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (!gallery.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.filter((entry) => entry.isIntersecting);
+      if (!visible.length) return;
+      setVisibleFrames((previous) => {
+        const next = new Set(previous);
+        for (const { target } of visible) next.add(target.getAttribute('data-frame') ?? '');
+        return next;
+      });
+      for (const { target } of visible) observer.unobserve(target);
+    }, { rootMargin: '160px 0px' });
+    gallery.current.querySelectorAll('[data-frame]').forEach((frame) => observer.observe(frame));
+    return () => observer.disconnect();
   }, []);
 
   // Interactive Service + Product Pairing Explorer state
@@ -143,6 +186,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
   // Interactive Client Timeline Showcase
   const timelineClients = useMemo(() => {
     const map = new Map<string, { clientId: string; clientName: string; count: number }>();
+    if (live) return [];
     INITIAL_COMPLETED_APPOINTMENTS.forEach((apt) => {
       const existing = map.get(apt.clientId);
       if (existing) {
@@ -156,15 +200,15 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
       }
     });
     return Array.from(map.values());
-  }, []);
+  }, [live]);
 
   const [showcaseClientId, setShowcaseClientId] = useState<string>(
     timelineClients[0]?.clientId ?? 'client-lucas',
   );
 
   const showcaseTimeline = useMemo(
-    () => INITIAL_COMPLETED_APPOINTMENTS.filter((a) => a.clientId === showcaseClientId),
-    [showcaseClientId],
+    () => live ? [] : INITIAL_COMPLETED_APPOINTMENTS.filter((a) => a.clientId === showcaseClientId),
+    [live, showcaseClientId],
   );
 
   const [showcaseAptId, setShowcaseAptId] = useState<string>('');
@@ -176,24 +220,31 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
   const featuredProducts = products.filter((p) => p.active && p.featured).slice(0, 4);
 
   return (
-    <div className="bg-[var(--bg-canvas)] overflow-x-clip transition-colors duration-200">
+    <div className="bg-[var(--bg-canvas)] transition-colors duration-200">
       {/* 1. LIVING CINEMA HERO (Always dark photographic canvas with guaranteed high-contrast scrims) */}
-      <section className="relative min-h-[78vh] sm:min-h-[82vh] flex items-center overflow-hidden border-b border-[var(--border-subtle)] bg-[#0B0B0D]">
+      <section
+        ref={hero}
+        aria-label="Salão NORDEN"
+        onMouseEnter={() => setHeroHovered(true)}
+        onMouseLeave={() => setHeroHovered(false)}
+        onFocus={() => setHeroFocused(true)}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setHeroFocused(false); }}
+        className="relative min-h-[min(34rem,78svh)] sm:min-h-[min(44rem,82svh)] flex items-center overflow-hidden border-b border-[var(--border-subtle)] bg-[#0B0B0D]">
         <div className="absolute inset-0">
-          <AnimatePresence mode="sync">
+          <AnimatePresence mode="sync" initial={false}>
             <motion.div
               key={heroIndex}
-              initial={{ opacity: 0 }}
+              initial={reduceMotion ? false : { opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              transition={{ duration: 1.2, ease: 'easeInOut' }}
+              transition={{ duration: reduceMotion ? 0 : 0.22 }}
               className="absolute inset-0"
             >
               <SafeImage
                 src={HERO_SCENES[heroIndex].image}
                 alt={HERO_SCENES[heroIndex].alt}
-                priority
-                className="w-full h-full object-cover object-center animate-kenburns"
+                priority={heroIndex === 0}
+                className="w-full h-full object-cover object-center"
               />
             </motion.div>
           </AnimatePresence>
@@ -231,7 +282,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
               transition={{ duration: 0.55, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
               className="mt-5 text-base sm:text-lg text-[#E7E2DB]/85 leading-relaxed max-w-xl"
             >
-              Reserve seu ritual em segundos, acompanhe seu antes e depois na sua linha do tempo privada e leve para casa exatamente a pomada e o elixir aplicados no seu atendimento.
+              Consulte os horários do salão, acompanhe seus atendimentos no Journey e conheça os produtos da NORDEN Store.
             </motion.p>
 
             <motion.div
@@ -259,7 +310,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                 href="#linha-do-tempo"
                 className="inline-flex items-center gap-2 px-5 min-h-[48px] py-3 text-sm font-medium text-[#E7E2DB] border border-[#E7E2DB]/30 hover:border-[#B58E65] hover:text-[#B58E65] rounded-lg transition-colors duration-150"
               >
-                Ver Antes &amp; Depois
+                {live ? 'Conhecer o Journey' : 'Ver antes e depois'}
                 <ArrowUpRight className="w-4 h-4" />
               </a>
             </motion.div>
@@ -271,20 +322,24 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
               transition={{ duration: 0.6, delay: 0.35 }}
               className="mt-12 pt-5 border-t border-[#8C8176]/28 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
             >
-              <div className="flex items-center gap-2.5">
+              <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 {HERO_SCENES.map((scene, idx) => (
                   <button
                     key={scene.caption}
                     type="button"
                     onClick={() => setHeroIndex(idx)}
+                    aria-pressed={idx === heroIndex}
                     aria-label={`Mostrar cena ${idx + 1}: ${scene.caption}`}
-                    className={`h-1 rounded-full transition-all duration-500 cursor-pointer ${
-                      idx === heroIndex
-                        ? 'w-12 bg-[#B58E65]'
-                        : 'w-5 bg-[#E7E2DB]/30 hover:bg-[#E7E2DB]/65'
-                    }`}
-                  />
+                    className="grid size-8 place-items-center rounded-md focus-visible:outline-[#E7E2DB]"
+                  >
+                    <span aria-hidden="true" className={`h-1 w-5 rounded-full ${idx === heroIndex ? 'bg-[#B58E65]' : 'bg-[#E7E2DB]/55'}`} />
+                  </button>
                 ))}
+                {!reduceMotion && (
+                  <button type="button" onClick={() => setRotationPaused((paused) => !paused)} className="min-h-9 rounded-md px-2 text-xs text-[#E7E2DB] underline underline-offset-4 focus-visible:outline-[#E7E2DB]">
+                    {rotationPaused ? 'Retomar troca de cenas' : 'Pausar troca de cenas'}
+                  </button>
+                )}
               </div>
               <p className="text-xs text-[#E7E2DB]/80 font-mono">
                 {HERO_SCENES[heroIndex].caption}
@@ -294,34 +349,37 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
         </div>
       </section>
 
-      {/* 2. INFINITE MOVING LOOKBOOK FILMSTRIP */}
+      {/* Editorial gallery */}
       <section
-        aria-label="Galeria em movimento NORDEN"
-        className="py-10 sm:py-12 border-b border-[var(--border-subtle)] bg-[var(--bg-band)] overflow-hidden marquee-group transition-colors duration-200"
+        aria-label="Galeria NORDEN"
+        className="py-10 sm:py-12 border-b border-[var(--border-subtle)] bg-[var(--bg-band)] transition-colors duration-200"
       >
         <div className="max-w-[1240px] mx-auto px-4 sm:px-8 mb-6 flex items-baseline justify-between gap-4">
           <p className="text-xs tracking-[0.22em] text-[var(--accent)] font-semibold uppercase">
-            Atmosfera &amp; Acabamentos em Movimento
+            Atmosfera e acabamentos
           </p>
           <p className="text-xs text-[var(--text-muted)] hidden sm:block">
-            Passe o cursor para pausar · Clique em qualquer ritual para agendar
+            Selecione uma imagem para consultar os horários
           </p>
         </div>
 
-        <div className="relative flex overflow-hidden">
-          <div className="flex gap-4 sm:gap-5 animate-marquee pr-5">
-            {[...LOOKBOOK_FRAMES, ...LOOKBOOK_FRAMES].map((frame, i) => (
+        <div ref={gallery} className="mx-auto max-w-[1240px] overflow-x-auto px-4 pb-2 sm:px-8">
+          <div className="flex w-max gap-4 sm:gap-5">
+            {LOOKBOOK_FRAMES.map((frame) => (
               <button
-                key={`${frame.title}-${i}`}
+                key={frame.title}
+                data-frame={frame.title}
                 type="button"
                 onClick={() => startBookingWithService(null, null)}
                 className="group relative w-[250px] sm:w-[320px] aspect-[16/10] rounded-xl overflow-hidden bg-[#1F1F23] border border-[var(--border-subtle)] shrink-0 text-left cursor-pointer"
               >
-                <SafeImage
-                  src={frame.image}
-                  alt={frame.title}
-                  className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                />
+                {visibleFrames.has(frame.title) && (
+                  <SafeImage
+                    src={frame.image}
+                    alt=""
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                )}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0B0B0D]/90 via-[#0B0B0D]/25 to-transparent" />
                 <div className="absolute bottom-3.5 left-4 right-4 flex items-end justify-between gap-2">
                   <div>
@@ -360,32 +418,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
           </p>
         </motion.div>
 
-        {/* Infinite Subtle Ritual Atmosphere Ticker */}
-        <div className="mb-10 overflow-hidden marquee-group border-y border-[var(--border-subtle)] py-3">
-          <div className="flex animate-marquee-reverse whitespace-nowrap items-center gap-8 text-xs tracking-[0.2em] uppercase text-[var(--text-muted)]">
-            {[
-              'Corte na Tesoura & Precisão',
-              'Toalha Quente & Vapor Botânico',
-              'Finalização Matte Sem Brilho',
-              'Visagismo Personalizado',
-              'Registro Antes & Depois',
-              'Manual NORDEN Care',
-              'Corte na Tesoura & Precisão',
-              'Toalha Quente & Vapor Botânico',
-              'Finalização Matte Sem Brilho',
-              'Visagismo Personalizado',
-              'Registro Antes & Depois',
-              'Manual NORDEN Care',
-            ].map((phrase, idx) => (
-              <span key={`${phrase}-${idx}`} className="inline-flex items-center gap-8 shrink-0">
-                <span className="hover:text-[var(--text-primary)] transition-colors">{phrase}</span>
-                <span aria-hidden="true" className="text-[var(--accent)]">
-                  ·
-                </span>
-              </span>
-            ))}
-          </div>
-        </div>
+
 
         {/* Visual Featured Services Grid with Cinemagraph Hover */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -409,8 +442,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
 
                 <div className="relative aspect-[16/10] overflow-hidden bg-[#141417]">
                   <div
-                    className="w-full h-full animate-cinemagraph"
-                    style={{ animationDelay: `${idx * -2.3}s` }}
+                    className="w-full h-full"
                   >
                     <SafeImage
                       src={srv.image || ASSETS.heroSalon}
@@ -425,12 +457,10 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                     className="pointer-events-none absolute inset-0 overflow-hidden opacity-45 group-hover:opacity-90 transition-opacity duration-500"
                   >
                     <div
-                      className="absolute -bottom-8 left-1/4 w-44 h-44 rounded-full bg-[radial-gradient(circle,rgba(231,226,219,0.22),rgba(181,142,101,0.08)_45%,transparent_72%)] blur-xl animate-steam-drift"
-                      style={{ animationDelay: `${idx * -1.8}s` }}
+                      className="absolute -bottom-8 left-1/4 w-44 h-44 rounded-full bg-[radial-gradient(circle,rgba(231,226,219,0.22),rgba(181,142,101,0.08)_45%,transparent_72%)] blur-xl"
                     />
                     <div
-                      className="absolute -bottom-10 right-1/4 w-36 h-36 rounded-full bg-[radial-gradient(circle,rgba(181,142,101,0.24),transparent_70%)] blur-xl animate-steam-drift-delayed"
-                      style={{ animationDelay: `${idx * -2.5}s` }}
+                      className="absolute -bottom-10 right-1/4 w-36 h-36 rounded-full bg-[radial-gradient(circle,rgba(181,142,101,0.24),transparent_70%)] blur-xl"
                     />
                   </div>
 
@@ -440,8 +470,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                     className="pointer-events-none absolute inset-0 overflow-hidden opacity-20 group-hover:opacity-80 transition-opacity duration-300"
                   >
                     <div
-                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent animate-light-sweep"
-                      style={{ animationDelay: `${idx * -1.9}s` }}
+                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent"
                     />
                   </div>
 
@@ -487,12 +516,13 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                             <button
                               key={prod.id}
                               type="button"
+                              disabled={Boolean(addingId) || storefrontStock(prod) === 0}
                               onClick={async () => {
                                 if (await addToCart(prod.id, 1)) setCartOpen(true);
                               }}
                               className="rounded-sm bg-[var(--accent)]/12 text-[var(--text-primary)] font-semibold ring-2 ring-[var(--accent)]/12 hover:bg-[var(--accent)]/25 underline decoration-[var(--accent)] underline-offset-4 transition-colors cursor-pointer"
                             >
-                              {prod.name}
+                            {addingId === prod.id ? 'Adicionando…' : prod.name}
                             </button>
                           ))}
                         </div>
@@ -592,7 +622,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
 
               <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-3 gap-4">
                 {pairedRitualProducts.slice(0, 3).map((prod) => {
-                  const avail = getAvailableStock(prod.physicalStock, prod.reservedStock);
+                  const avail = storefrontStock(prod);
                   return (
                     <div
                       key={prod.id}
@@ -618,14 +648,16 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                           </span>
                           <button
                             type="button"
-                            disabled={avail === 0}
+                            disabled={avail === 0 || Boolean(addingId)}
                             onClick={async () => {
                               if (await addToCart(prod.id, 1)) setCartOpen(true);
                             }}
                             className="inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--text-primary)] hover:text-[var(--accent)] cursor-pointer"
                           >
-                            <Plus className="w-3 h-3" />
-                            Levar
+                            {addingId === prod.id ? 'Adicionando…' : <>
+                              <Plus className="w-3 h-3" aria-hidden="true" />
+                              Levar
+                            </>}
                           </button>
                         </div>
                       </div>
@@ -639,7 +671,29 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
       </section>
 
       {/* 4. STAR FEATURE: CLIENT TIMELINE WITH BEFORE & AFTER + EXACT PRODUCTS USED */}
-      <section
+      {live ? (
+        <section id="linha-do-tempo" className="border-y border-[var(--border-subtle)] bg-[var(--bg-band)] py-12 sm:py-16">
+          <div className="mx-auto grid max-w-[1240px] gap-7 px-4 sm:px-8 md:grid-cols-2 md:items-center">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.22em] text-[var(--accent)]">NORDEN Journey</p>
+              <h2 className="font-display text-3xl font-semibold tracking-tight sm:text-4xl">Seu histórico de cuidados</h2>
+              <p className="mt-3 max-w-md text-sm leading-relaxed text-[var(--text-muted)]">
+                Consulte os atendimentos concluídos, os produtos usados e as orientações do NORDEN Care.
+                Acompanhe no Flow as ofertas de antecipação do seu horário.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-4 md:justify-end">
+              <a href="/usuario" className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-[var(--accent)] px-4 text-sm font-semibold text-[var(--accent-fg)]">
+                Abrir minha área <ArrowRight size={16} aria-hidden="true" />
+              </a>
+              <a href="https://da0602766-byte.github.io/NORDEN/?perfil=cliente#/app" className="rounded-sm px-1 py-2 text-sm font-semibold text-[var(--accent)] underline underline-offset-4">
+                Ver demonstração do Journey
+              </a>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <section
         id="linha-do-tempo"
         className="border-y border-[var(--border-subtle)] bg-[var(--bg-band)] py-16 sm:py-24 transition-colors duration-200"
       >
@@ -663,7 +717,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
               <span className="text-[11px] text-[var(--text-muted)]">
                 Alterne para explorar a linha do tempo de cada cliente (demo):
               </span>
-              <div className="inline-flex items-center gap-1 p-1 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-xl">
+              <div className="inline-flex flex-wrap items-center gap-1 p-1 bg-[var(--bg-surface)] border border-[var(--border-strong)] rounded-xl">
                 {timelineClients.map((cl) => (
                   <button
                     key={cl.clientId}
@@ -701,10 +755,9 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                   beforeLabel="Antes do Ritual"
                   afterLabel="Depois no NORDEN"
                   altSubject={`${activeShowcaseApt.clientName} — ${activeShowcaseApt.serviceName}`}
-                  autoAnimate={true}
                 />
                 <div className="flex items-center justify-between text-xs text-[var(--text-muted)] px-1 gap-3">
-                  <span>Arraste o controle ou observe a comparação contínua</span>
+                  <span>Arraste o controle ou use as setas do teclado</span>
                   <span className="font-mono font-medium text-[var(--text-primary)] shrink-0">
                     {formatDateBR(activeShowcaseApt.date)}
                   </span>
@@ -774,7 +827,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                           ? products.find((p) => p.id === used.productId)
                           : null;
                         const avail = prod
-                          ? getAvailableStock(prod.physicalStock, prod.reservedStock)
+                          ? storefrontStock(prod)
                           : 0;
 
                         return (
@@ -807,13 +860,16 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                                 </p>
                                 <button
                                   type="button"
+                                  disabled={Boolean(addingId)}
                                   onClick={async () => {
                                     if (await addToCart(prod.id, 1)) setCartOpen(true);
                                   }}
                                   className="inline-flex items-center gap-1 px-3 py-1.5 text-[11px] font-semibold text-[var(--accent-fg)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] rounded-md transition-colors cursor-pointer"
                                 >
-                                  <ShoppingBag className="w-3 h-3" />
-                                  Comprar
+                                  {addingId === prod.id ? 'Adicionando…' : <>
+                                    <ShoppingBag className="w-3 h-3" aria-hidden="true" />
+                                    Comprar
+                                  </>}
                                 </button>
                               </div>
                             )}
@@ -843,6 +899,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
           )}
         </div>
       </section>
+      )}
 
       {/* 5. FEATURED NORDEN STORE SHOWCASE */}
       <section className="max-w-[1240px] mx-auto px-4 sm:px-8 py-16 sm:py-24">
@@ -871,7 +928,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {featuredProducts.map((product, idx) => {
-            const available = getAvailableStock(product.physicalStock, product.reservedStock);
+            const available = storefrontStock(product);
             const activePrice = product.promoPriceCents ?? product.priceCents;
 
             return (
@@ -897,8 +954,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                   className="aspect-[4/3] w-full overflow-hidden bg-[#141417] cursor-pointer relative"
                 >
                   <div
-                    className="w-full h-full animate-cinemagraph"
-                    style={{ animationDelay: `${idx * -2.2}s` }}
+                    className="w-full h-full"
                   >
                     <SafeImage
                       src={product.image}
@@ -911,8 +967,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                     className="pointer-events-none absolute inset-0 opacity-20 group-hover:opacity-65 transition-opacity duration-500"
                   >
                     <div
-                      className="absolute -inset-6 bg-[radial-gradient(circle_at_70%_30%,rgba(181,142,101,0.32),transparent_60%)] animate-orbit-glow"
-                      style={{ animationDelay: `${idx * -1.3}s` }}
+                      className="absolute -inset-6 bg-[radial-gradient(circle_at_70%_30%,rgba(181,142,101,0.32),transparent_60%)]"
                     />
                   </div>
                   <div
@@ -920,8 +975,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                     className="pointer-events-none absolute inset-0 overflow-hidden opacity-25 group-hover:opacity-85 transition-opacity duration-300"
                   >
                     <div
-                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent animate-light-sweep"
-                      style={{ animationDelay: `${idx * -1.8}s` }}
+                      className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-[#E7E2DB]/20 to-transparent"
                     />
                   </div>
                 </button>
@@ -944,7 +998,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                       <span className="text-sm font-semibold text-[var(--text-primary)]">
                         {formatBRL(activePrice)}
                       </span>
-                      {product.promoPriceCents && (
+                      {product.promoPriceCents != null && (
                         <span className="ml-2 text-xs text-[var(--text-muted)] line-through">
                           {formatBRL(product.priceCents)}
                         </span>
@@ -953,7 +1007,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
 
                     <button
                       type="button"
-                      disabled={available === 0}
+                      disabled={available === 0 || Boolean(addingId)}
                       onClick={async () => {
                         if (await addToCart(product.id, 1)) {
                           setCartOpen(true);
@@ -961,8 +1015,10 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
                       }}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--text-primary)] bg-[var(--bg-surface-alt)] hover:bg-[var(--accent)] hover:text-[var(--accent-fg)] border border-[var(--border-strong)] hover:border-[var(--accent)] rounded-md transition-colors disabled:opacity-40 cursor-pointer"
                     >
-                      <Plus className="w-3.5 h-3.5" />
-                      Sacola
+                      {addingId === product.id ? 'Adicionando…' : <>
+                        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                        Sacola
+                      </>}
                     </button>
                   </div>
                 </div>
@@ -1045,7 +1101,7 @@ export const LandingContent: React.FC<LandingProps> = (props) => {
             Reserve seu horário agora e comece sua linha do tempo NORDEN.
           </h2>
           <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto">
-            Escolha serviço, especialista e produtos de preferência em menos de 1 minuto.
+            Consulte os serviços e os horários disponíveis para o seu próximo atendimento.
           </p>
           <div className="pt-2 flex flex-wrap justify-center gap-3.5">
             <button

@@ -43,13 +43,11 @@ async function consume(db,purpose,raw) {
 async function deliver(context,email,purpose,raw) {
   const message={email,purpose,path:'/conta/'+purpose+'?token='+raw};
   if(context.deliver) {
-    try { await context.deliver(message); }
-    catch(error) { console.error('Falha no envio de e-mail NORDEN',error.code??error.name); }
-    return;
+    await context.deliver(message);
+  } else if (context.outbox) {
+    mkdirSync(context.outbox,{recursive:true,mode:0o700});
+    writeFileSync(join(context.outbox,String(now())+'-'+id()+'.json'),encode(message),{mode:0o600});
   }
-  if (!context.outbox) return;
-  mkdirSync(context.outbox,{recursive:true,mode:0o700});
-  writeFileSync(join(context.outbox,String(now())+'-'+id()+'.json'),encode(message),{mode:0o600});
 }
 function credentials(body) {
   if (body.password !== body.confirm) fail('As senhas não coincidem.');
@@ -74,8 +72,12 @@ export const identityActions = {
       const account = await createAccount(db,profile,key,'cliente');
       return {session:await startSession(db,account), verification:ctx.deliver||ctx.outbox?await issue(db,'verificar',account.id,{},day):null};
     });
-    if(result.verification) await deliver(ctx,profile.email,'verificar',result.verification);
-    return {cookie:result.session,data:{ok:true}};
+    let verificationFailed=false;
+    if(result.verification) {
+      try { await deliver(ctx,profile.email,'verificar',result.verification); }
+      catch { verificationFailed=true; console.error('Falha na verificação de e-mail NORDEN'); }
+    }
+    return {cookie:result.session,data:{ok:true,verificationFailed}};
   },
   async login(db,body) {
     const account = await db.get('SELECT * FROM accounts WHERE email=? AND active=1',email(body.email));
@@ -90,7 +92,7 @@ export const identityActions = {
     return {cookie:'',data:{ok:true}};
   },
   async recover(db,body,_user,ctx) {
-    if(!ctx.deliver&&!ctx.outbox) fail('A recuperação por e-mail ainda não está configurada.',503);
+    if(!ctx.deliver&&!ctx.outbox) fail('A recuperação por e-mail está indisponível. Entre em contato com a equipe.',503);
     const target = email(body.email);
     const account = await db.get('SELECT id FROM accounts WHERE email=? AND active=1',target);
     if (account) {
@@ -98,7 +100,8 @@ export const identityActions = {
         await db.run("UPDATE tokens SET used=? WHERE target=? AND purpose='redefinir' AND used IS NULL",now(),account.id);
         return await issue(db,'redefinir',account.id);
       });
-      await deliver(ctx,target,'redefinir',raw);
+      try { await deliver(ctx,target,'redefinir',raw); }
+      catch { console.error('Falha na recuperação por e-mail NORDEN'); }
     }
     return {ok:true};
   },
@@ -115,13 +118,14 @@ export const identityActions = {
   },
   async resend(db,_body,user,ctx) {
     if (!user) fail('Entre novamente.',401);
-    if(!ctx.deliver&&!ctx.outbox) fail('O envio de e-mail ainda não está configurado.',503);
+    if(!ctx.deliver&&!ctx.outbox) fail('O envio de e-mail está indisponível.',503);
     if (!user.verified) {
       const raw = await db.tx(async ()=>{
         await db.run("UPDATE tokens SET used=? WHERE target=? AND purpose='verificar' AND used IS NULL",now(),user.id);
         return await issue(db,'verificar',user.id,{},day);
       });
-      await deliver(ctx,user.email,'verificar',raw);
+      try { await deliver(ctx,user.email,'verificar',raw); }
+      catch { fail('Não foi possível enviar o link agora. Tente novamente mais tarde.',503); }
     }
     return {ok:true};
   },

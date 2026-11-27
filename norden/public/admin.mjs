@@ -40,7 +40,7 @@ function dashboard() {
     ${lines(upcoming.slice(0,6),bookLine,empty('Nenhum atendimento no período'))}</section>
   <section class="panel">${sectionHead('Disponibilidade',link('/gestao/agenda#disponibilidade','Consultar horários','text-button'))}
     ${lines(windows.slice(0,6),w=>row(w.professional,when(w.starts)+' até '+clock(w.ends),link('/gestao/flow','Ver opções','text-button')),empty('Nenhuma janela liberada por cancelamento'))}
-    ${manager()?banner('Os pedidos simulados ficam registrados para avaliação e não compõem receita.'):''}</section></div>`;
+    ${manager()&&data().settings.payment==='simulado'?banner('Os pedidos simulados ficam registrados para avaliação e não compõem receita.'):''}</section></div>`;
 }
 function availabilityForm(manual=false) {
   const professionals=publicItems('professionals').filter(p=>manager()||p.id===data().user.professionalId);
@@ -54,7 +54,7 @@ function availabilityForm(manual=false) {
       field('Data','date',ready?.fields.date??addDays(data().today,1),'date','required min="'+data().today+'" data-watch="adminDate"'))+
     `<div class="actions">${button('Consultar horários','button outline','type="submit" name="phase" value="consultar"')}</div>`+
     (ready?ready.slots.length?select('Horários · Brasília','clock',ready.slots.map(s=>[s.clock,s.clock]),'')+
-      (manual?hidden('price',ready.price)+button('Confirmar reserva','button primary','name="phase" value="confirmar"'):''):
+      (manual?hidden('price',ready.price)+hidden('duration',ready.duration)+hidden('padding',ready.padding)+button('Confirmar reserva','button primary','name="phase" value="confirmar"'):''):
       banner('Sem horários livres para essa combinação.'):notice('Escolha um serviço, um profissional e uma data.')));
 }
 function agenda() {
@@ -270,12 +270,12 @@ function settings() {
     ['Horizonte do Flow (dias)','flowDays'],['Validade da oferta (h)','offerHours'],['Tarifa por km (centavos)','deliveryRate'],
     ['Cobertura (km)','deliveryMax'],['Taxa base (centavos)','deliveryBase'],['Taxa mínima (centavos)','deliveryMinimum']];
   return `${staffHead('Configurações','Parâmetros operacionais e conteúdo público.')}
-  <div class="split"><section class="panel" id="conteudo"><h2>Salão e regras</h2>${form('settings',textarea('Título da página inicial (duas linhas)','headline',s.headline,'required')+
+  <div class="split"><section class="panel"><h2>Salão e regras</h2>${form('settings',textarea('Título da página inicial (duas linhas)','headline',s.headline,'required')+
     textarea('Apresentação','introduction',s.introduction,'required')+pair(field('Endereço','address',s.address),field('Contato','contact',s.contact),
     field('Horário ao público','hoursText',s.hoursText))+textarea('Instruções de retirada','pickup',s.pickup)+
     textarea('Perguntas frequentes (pergunta | resposta por linha)','faq',s.faq.map(x=>x.join(' | ')).join('\n'))+
     pair(...nums.map(([title,key])=>amount(title,key,s[key])))+
-    select('Pagamento','payment',[['simulado','Simulado'],['presencial','Presencial']],s.payment)+
+    (data().production?notice('Forma de pagamento: presencial.'):select('Pagamento','payment',[['simulado','Simulado'],['presencial','Presencial']],s.payment))+
     check('Habilitar avaliações após atendimento.','reviews',s.reviews)+notice('Fuso da agenda: America/Sao_Paulo. Notificações internas estão ativas.')+button('Salvar configurações'))}</section>
     <aside class="panel"><h2>Convites de equipe</h2>${form('invite',field('E-mail','email','','email','required')+
       select('Papel','role',[['profissional','Profissional'],['gestor','Gestor']])+

@@ -1,3 +1,10 @@
+import type { StorefrontProduct } from '../types';
+
+export function storefrontStock(product: StorefrontProduct): number {
+  return 'availableStock' in product ? product.availableStock :
+    getAvailableStock(product.physicalStock, product.reservedStock);
+}
+
 export function formatBRL(cents: number): string {
   return (cents / 100).toLocaleString('pt-BR', {
     style: 'currency',

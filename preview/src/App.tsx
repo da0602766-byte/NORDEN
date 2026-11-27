@@ -21,12 +21,13 @@ const AppShell: React.FC = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[var(--bg-canvas)] text-[var(--text-primary)] transition-colors duration-200">
+      <a href="#conteudo" className="sr-only focus:not-sr-only">Ir para o conteúdo</a>
       <Navbar />
 
       <p className="border-b border-[var(--border-subtle)] px-4 py-2 text-center text-sm text-[var(--text-secondary)]">
         Demonstração interativa · As simulações ficam neste navegador. Use dados fictícios.
       </p>
-      <main className="flex-1">
+      <main id="conteudo" tabIndex={-1} className="flex-1">
         <AnimatePresence mode="wait">
           <motion.div
             key={currentView}

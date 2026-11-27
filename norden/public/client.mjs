@@ -27,13 +27,19 @@ export function clientHome() {
 }
 export function bookingWizard() {
   const services=publicItems('services'), allPros=publicItems('professionals');
+  if(!services.length||!allPros.length||!data().catalog.compatibility.some(link=>
+    services.some(s=>s.id===link.service_id)&&allPros.some(p=>p.id===link.professional_id))) {
+    return pageHead('Agendar horário')+empty('Agenda online indisponível','Ainda não há serviços com equipe disponível. Consulte os serviços ou entre em contato com o salão.',link('/servicos','Ver serviços','button outline'));
+  }
   if(!state.draft) {
     const queryService=q('servico'),queryPro=q('profissional');
     state.draft={step:1,serviceId:services.some(s=>s.id===queryService)?queryService:'',professionalId:allPros.some(p=>p.id===queryPro)?queryPro:'',
       preferences:[],date:addDays(data().today,1),clock:'',slots:null,price:null,lastError:''};
   }
   const d=state.draft,service=find('services',d.serviceId),prof=find('professionals',d.professionalId);
+  if(d.step>1&&!service?.active) d.step=1;
   const pros=allPros.filter(p=>data().catalog.compatibility.some(c=>c.service_id===d.serviceId&&c.professional_id===p.id));
+  if(d.step>2&&!pros.some(p=>p.id===d.professionalId)) d.step=2;
   const products=data().catalog.serviceProducts.filter(c=>c.service_id===d.serviceId).map(c=>find('products',c.product_id)).filter(p=>p?.active);
   const labels=['Serviço','Equipe','Produtos','Horário','Revisão'];
   let view='';
@@ -47,11 +53,11 @@ export function bookingWizard() {
   if(d.step===4) view=`<h2>Escolha a data e o horário.</h2><div class="date-pick">
     ${field('Data','date',d.date,'date','required min="'+data().today+'" max="'+addDays(data().today,data().catalog.info.bookingDays)+'" data-watch="bookDate"')}
     ${button('Consultar horários','button outline','type="button" data-command="slots"')}</div>
-    <div aria-live="polite">${d.slots===null?'<p class="hint">Consulte a disponibilidade para a data selecionada.</p>':d.slots.length?
+    <div aria-live="polite">${d.slots===null&&!d.lastError?'<p class="hint">Consulte a disponibilidade para a data selecionada.</p>':d.slots?.length?
       `<fieldset class="choice-list"><legend>Horários disponíveis · Brasília</legend><div class="slot-grid">${d.slots.map(s=>`<label class="slot"><input type="radio" required name="clock" value="${s.clock}" ${d.clock===s.clock?'checked':''}><span>${s.clock}</span></label>`).join('')}</div></fieldset>`:
-      empty('Sem horários nesta data','Tente outra data ou outro profissional.')}</div>`;
+      d.lastError?'':empty('Sem horários nesta data','Tente outra data ou outro profissional.')}</div>`;
   if(d.step===5) view=`<h2>Revise seu agendamento.</h2>${row('Serviço',service.name,money(d.price??service.price))}${row('Profissional',prof.name)}
-    ${row('Horário',d.date.split('-').reverse().join('/')+' · '+d.clock,service.duration+' min')}${row('Preferências',products.filter(p=>d.preferences.includes(p.id)).map(p=>p.name).join(', ')||'Sem preferência')}
+    ${row('Horário',d.date.split('-').reverse().join('/')+' · '+d.clock,(d.duration??service.duration)+' min')}${row('Preferências',products.filter(p=>d.preferences.includes(p.id)).map(p=>p.name).join(', ')||'Sem preferência')}
     ${banner(data().catalog.info.cancellationHours?'Cancelamento online até '+data().catalog.info.cancellationHours+' h antes.':'Cancelamento online disponível até o início da reserva.')}
     ${data().user?.role==='cliente'?check('Revisei o horário e o prazo de cancelamento.','review',false,'required'):banner('Entre ou crie uma conta para confirmar. Suas escolhas serão preservadas.')}`;
   const items=[null,services.length,pros.length,true,d.slots?.length,true];
@@ -61,7 +67,7 @@ export function bookingWizard() {
       <div class="actions wizard-actions">${d.step>1?button('Voltar','button outline','type="button" data-command="previousStep"'):''}
       ${items[d.step]?button(d.step<5?'Continuar':data().user?.role==='cliente'?'Confirmar agendamento':'Entrar para confirmar'):
       button('Continuar','button outline','disabled')}</div></div>`)}</div>
-    <aside class="panel booking-summary">${eyebrow('RESUMO')}<h2>Seu atendimento</h2>${service?row(service.name,service.duration+' min',money(d.price??service.price)):notice('Selecione um serviço para começar.')}
+    <aside class="panel booking-summary">${eyebrow('RESUMO')}<h2>Seu atendimento</h2>${service?row(service.name,(d.duration??service.duration)+' min',money(d.price??service.price)):notice('Selecione um serviço para começar.')}
     ${prof&&d.step>1?row(prof.name,prof.specialty):''}${d.clock?row(d.clock,d.date.split('-').reverse().join('/')):''}
     <div class="summary-note">${icon('clock',17)} Horários de Brasília</div></aside></div>`;
 }
@@ -197,15 +203,18 @@ function checkout() {
   if(!cart.items.length) return empty('Seu carrinho está vazio','',link('/loja','Ir para a loja','button primary'));
   const d=state.checkout??{mode:'retirada',name:user.name,phone:user.phone},quote=state.quote;
   const pickup=catalog.info.pickup;
+  const discount=quote?.items.reduce((sum,item)=>sum+item.quantity*item.discount,0)??0;
   return `${pageHead('Finalizar pedido','Revise o recebimento e o valor antes de confirmar.',link('/app/carrinho','Voltar ao carrinho','button outline'))}
     <div class="booking-layout"><section class="panel"><h2>Dados de recebimento</h2>
       ${form('quote',pair(field('Destinatário','name',d.name,'text','required'),field('Telefone','phone',d.phone,'tel','required'))+
       select('Modalidade','mode',[['retirada','Retirada'],['entrega','Entrega']],d.mode,'data-watch="checkout"')+
       (d.mode==='entrega'?select('Endereço','addressId',[['','Novo endereço'],...addresses.map(a=>[a.id,a.label])],d.addressId??'','data-watch="checkout"')+
         (d.addressId?'':addressInputs(d.address))+field('Distância estimada (km)','distance',d.distance??'','number','step="0.01" min="0.01" required')+
-        notice('Informe a distância estimada. Cobertura de até '+catalog.info.deliveryMax+' km.'):`<p>${esc(pickup)}</p>`)+button('Calcular e revisar'))}
-      </section><aside class="panel quote-pane"><h2>Resumo do pedido</h2>${row('Subtotal','',money(quote?.subtotal??cart.subtotal))}
-        ${row('Taxa',quote?.rules.estimated?quote.rules.distance+' km estimados':quote?'Retirada':'A calcular',quote?money(quote.fee):'—')}
+        notice('Informe a distância aproximada. Cobertura estimada de até '+catalog.info.deliveryMax+' km.'):`<p>${esc(pickup)}</p>`)+button('Calcular e revisar'))}
+      </section><aside class="panel quote-pane"><h2>Resumo do pedido</h2>${row('Subtotal dos produtos','',money(quote?.subtotal??cart.subtotal))}
+        ${discount?row('Desconto incluído no subtotal','',money(discount)):''}
+        ${row(quote?.rules.estimated?'Taxa estimada':'Taxa',quote?.rules.estimated?quote.rules.distance+' km informados por você':quote?'Retirada':'A calcular',quote?money(quote.fee):'—')}
+        ${quote?.rules.estimated?notice('A taxa e a cobertura dependem da distância informada. A equipe confirma a entrega e o valor com você antes do pagamento presencial.'):''}
         ${quote?rowsForQuote(quote):''}${row('Total','',quote?money(quote.total):'—')}${banner(catalog.info.payment==='simulado'?'Pagamento simulado. Nenhuma cobrança será realizada.':'Pagamento presencial. Nenhuma cobrança online.')}
         ${quote?form('checkout',check('Revisei modalidade, itens e total.','confirm',false,'required')+button('Confirmar pedido')):notice('Calcule o valor para liberar a confirmação.')}</aside></div>`;
 }
@@ -216,7 +225,7 @@ export function orderView(order,adminActions='') {
   return `${link(adminActions?'/gestao/pedidos':'/app/pedidos','Todos os pedidos','text-button')}
     ${pageHead('Pedido '+o.id.slice(0,8).toUpperCase(),when(o.created)+' · '+(o.mode==='entrega'?'Entrega':'Retirada'),status(o.status))}
     <div class="split"><section class="panel"><h2>Itens</h2>${o.items.map(p=>row(p.name,p.quantity+' × '+money(p.price),money(p.quantity*p.price))).join('')}
-    ${row('Subtotal','',money(o.subtotal))}${row('Taxa',o.quote.estimated?o.quote.distance+' km estimados':'Retirada',money(o.fee))}
+    ${row('Subtotal','',money(o.subtotal))}${row(o.quote.estimated?'Taxa estimada':'Taxa',o.quote.estimated?o.quote.distance+' km informados':'Retirada',money(o.fee))}
     ${row('Total',label(o.financial),money(o.total))}<h3>Recebimento</h3><p>${esc(o.destination.name)} · ${esc(o.destination.phone)}</p>
     <p>${a?esc([a.street,a.number,a.extra,a.district,a.city,a.state,a.zip].filter(Boolean).join(', ')):esc(o.destination.pickup)}</p>
     ${adminActions}</section><section class="panel"><h2>Histórico do pedido</h2>${eventList(o.events,'status')}</section></div>`;

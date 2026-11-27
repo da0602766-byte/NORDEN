@@ -146,7 +146,7 @@ export const catalogActions = {
     await audit(db,user.id,'GALERIA_ATUALIZADA','galeria',key);
     return {id:key};
   },
-  async settings(db,body,user) {
+  async settings(db,body,user,{production=false}={}) {
     manager(user);
     const settings=await db.settings();
     const texts={headline:120,introduction:300,address:300,contact:180,hoursText:200,pickup:500};
@@ -154,7 +154,7 @@ export const catalogActions = {
       deliveryRate:[0,100000],deliveryMax:[1,300],deliveryBase:[0,100000],deliveryMinimum:[0,100000]};
     for(const [key,max] of Object.entries(texts)) settings[key]=str(body[key],key,max,['headline','introduction'].includes(key)?2:0);
     for(const [key,[min,max]] of Object.entries(ranges)) settings[key]=integer(body[key],key,min,max);
-    settings.payment=selection(body.payment,['simulado','presencial'],'pagamento');
+    settings.payment=production?'presencial':selection(body.payment,['simulado','presencial'],'pagamento');
     settings.reviews=body.reviews===true;
     settings.faq=array(body.faq,15).map(value=>[str(value[0],'pergunta',130,2),str(value[1],'resposta',500,2)]);
     return await db.tx(async ()=>{

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { AnimatePresence, motion } from 'motion/react';
+import React, { useState } from 'react';
+import { Modal } from './Modal';
 import { X, Plus, Minus, Trash2, ShoppingBag, CheckCircle2, ArrowRight, ArrowLeft } from 'lucide-react';
 import { useNorden } from '../context/NordenContext';
 import { formatBRL, getAvailableStock } from '../utils/format';
@@ -40,29 +40,9 @@ export const CartDrawer: React.FC = () => {
 
   const handleClose = () => {
     setCartOpen(false);
-    window.setTimeout(() => {
-      if (step === 'confirmed') setStep('bag');
-      setCheckoutError(null);
-    }, 250);
+    if (step === 'confirmed') setStep('bag');
+    setCheckoutError(null);
   };
-
-  useEffect(() => {
-    if (!isCartOpen) return;
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      setCartOpen(false);
-      setCheckoutError(null);
-      if (step === 'confirmed') setStep('bag');
-    };
-    window.addEventListener('keydown', closeOnEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      window.removeEventListener('keydown', closeOnEscape);
-    };
-  }, [isCartOpen, setCartOpen, step]);
 
   const handleConfirmOrder = (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,30 +91,13 @@ export const CartDrawer: React.FC = () => {
   };
 
   return (
-    <AnimatePresence>
-      {isCartOpen && (
-        <div
-          className="fixed inset-0 z-50 flex justify-end"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Sacola NORDEN Store"
-        >
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.18 }}
-            onClick={handleClose}
-            className="fixed inset-0 bg-black/70 backdrop-blur-sm"
-          />
-
-          <motion.aside
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            className="relative z-10 w-full max-w-md bg-[var(--bg-surface)] border-l border-[var(--border-strong)] h-full flex flex-col shadow-2xl"
-          >
+    <Modal
+      open={isCartOpen}
+      onDismiss={handleClose}
+      aria-labelledby="cart-title"
+      className="fixed inset-y-0 left-auto right-0 m-0 h-dvh max-h-dvh w-full max-w-md overflow-hidden border-l border-[var(--border-strong)] bg-[var(--bg-surface)] text-[var(--text-primary)] shadow-2xl backdrop:bg-black/70"
+    >
+      <div className="flex h-full flex-col">
             {/* Header */}
             <div className="px-5 sm:px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
               <div className="flex items-center gap-2.5">
@@ -151,7 +114,7 @@ export const CartDrawer: React.FC = () => {
                     <ArrowLeft className="w-4 h-4" />
                   </button>
                 )}
-                <h2 className="font-display text-lg font-semibold text-[var(--text-primary)]">
+                <h2 id="cart-title" className="font-display text-lg font-semibold text-[var(--text-primary)]">
                   {step === 'bag'
                     ? 'Sua Sacola'
                     : step === 'checkout'
@@ -161,6 +124,7 @@ export const CartDrawer: React.FC = () => {
               </div>
               <button
                 type="button"
+                data-initial-focus
                 onClick={handleClose}
                 aria-label="Fechar sacola"
                 className="min-w-[44px] min-h-[44px] -mr-2 flex items-center justify-center rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors cursor-pointer"
@@ -408,21 +372,24 @@ export const CartDrawer: React.FC = () => {
                         </div>
                         <div className="col-span-2">
                           <label htmlFor="chk-neigh" className="block text-[11px] text-[var(--text-muted)] mb-1">
-                            Bairro / Cidade
+                            Bairro
                           </label>
                           <input
                             id="chk-neigh"
                             type="text"
-                            value={`${neighborhood} · ${city}/${uf}`}
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              setNeighborhood(val);
-                              setCity('São Paulo');
-                              setUf('SP');
-                            }}
+                            value={neighborhood}
+                            onChange={(e) => setNeighborhood(e.target.value)}
                             className="w-full px-3 py-2 text-xs bg-[var(--bg-input)] border border-[var(--border-strong)] rounded-lg text-[var(--text-primary)]"
                           />
                         </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2.5">
+                        <label className="col-span-2 text-xs">Cidade
+                          <input value={city} onChange={(event) => setCity(event.target.value)} className="mt-1 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-input)] px-3 py-2" />
+                        </label>
+                        <label className="text-xs">UF
+                          <input value={uf} onChange={(event) => setUf(event.target.value.toUpperCase())} maxLength={2} className="mt-1 w-full rounded-lg border border-[var(--border-strong)] bg-[var(--bg-input)] px-3 py-2" />
+                        </label>
                       </div>
                     </div>
                   )}
@@ -434,7 +401,7 @@ export const CartDrawer: React.FC = () => {
                   </div>
 
                   {checkoutError && (
-                    <p className="text-xs text-[var(--status-warn)] bg-[var(--bg-surface-alt)] border border-[var(--status-warn)]/35 rounded-lg px-3 py-2">
+                    <p role="alert" className="text-xs text-[var(--status-warn)] bg-[var(--bg-surface-alt)] border border-[var(--status-warn)]/35 rounded-lg px-3 py-2">
                       {checkoutError}
                     </p>
                   )}
@@ -552,9 +519,7 @@ export const CartDrawer: React.FC = () => {
                 )}
               </div>
             )}
-          </motion.aside>
-        </div>
-      )}
-    </AnimatePresence>
+      </div>
+    </Modal>
   );
 };

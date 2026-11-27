@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { Menu, Moon, Sun, X, User, Briefcase, ShoppingBag } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useNorden } from '../context/NordenContext';
@@ -22,6 +22,7 @@ export const Navbar: React.FC = () => {
   } = useNorden();
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const menuButton = useRef<HTMLButtonElement>(null);
 
   const pendingClientOffers = flowOffers.filter(
     (o) => o.clientId === clientProfile.id && o.status === 'OFERTADA',
@@ -61,7 +62,12 @@ export const Navbar: React.FC = () => {
         : 'Entrar';
 
   return (
-    <header className="sticky top-0 z-40 bg-[var(--bg-header)] backdrop-blur-md border-b border-[var(--border-subtle)] transition-colors duration-200">
+    <header onKeyDown={(event) => {
+      if (event.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false);
+        menuButton.current?.focus();
+      }
+    }} className="sticky top-0 z-[var(--layer-header)] bg-[var(--bg-header)] backdrop-blur-md border-b border-[var(--border-subtle)] transition-colors duration-200">
       <div className="max-w-[1240px] mx-auto px-3 sm:px-8 h-16 flex items-center justify-between gap-2 sm:gap-6">
         {/* Zone 1: Single-line Brand Wordmark & Redesigned Vector Emblem */}
         <button
@@ -138,7 +144,7 @@ export const Navbar: React.FC = () => {
             onClick={toggleTheme}
             aria-label={theme === 'dark' ? 'Ativar modo claro' : 'Ativar modo escuro'}
             title={theme === 'dark' ? 'Modo Claro' : 'Modo Escuro'}
-            className="w-10 h-10 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
+            className="w-10 h-10 max-[374px]:w-8 flex items-center justify-center rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] text-[var(--text-primary)] hover:border-[var(--accent)] hover:text-[var(--accent)] transition-colors shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
           </button>
@@ -149,17 +155,19 @@ export const Navbar: React.FC = () => {
               setMobileMenuOpen(false);
               startBookingWithService(null, null);
             }}
-            className="px-3.5 sm:px-4 h-10 text-xs sm:text-sm font-semibold text-[var(--accent-fg)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] active:scale-[0.98] rounded-lg transition-all duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-primary)]"
+            className="px-2.5 sm:px-4 h-10 text-xs sm:text-sm font-semibold text-[var(--accent-fg)] bg-[var(--accent)] hover:bg-[var(--accent-hover)] active:scale-[0.98] rounded-lg transition-all duration-150 whitespace-nowrap shrink-0 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--text-primary)]"
           >
             Agendar
           </button>
 
           <button
             type="button"
+            ref={menuButton}
             onClick={() => setMobileMenuOpen((v) => !v)}
             className="lg:hidden w-10 h-10 flex items-center justify-center text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-surface)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] cursor-pointer"
             aria-label={mobileMenuOpen ? 'Fechar menu' : 'Abrir menu'}
             aria-expanded={mobileMenuOpen}
+            aria-controls={mobileMenuOpen ? "demo-mobile-menu" : undefined}
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </button>
@@ -169,7 +177,9 @@ export const Navbar: React.FC = () => {
       {/* Mobile Navigation Drawer */}
       <AnimatePresence>
         {mobileMenuOpen && (
-          <motion.div
+          <motion.nav
+            id="demo-mobile-menu"
+            aria-label="Menu principal"
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -8 }}
@@ -279,7 +289,7 @@ export const Navbar: React.FC = () => {
                 </button>
               </div>
             </div>
-          </motion.div>
+          </motion.nav>
         )}
       </AnimatePresence>
     </header>

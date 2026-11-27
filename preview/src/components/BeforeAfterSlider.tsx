@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { MoveHorizontal } from 'lucide-react';
 import { SafeImage } from './SafeImage';
 
@@ -8,75 +8,21 @@ interface BeforeAfterSliderProps {
   beforeLabel?: string;
   afterLabel?: string;
   altSubject: string;
-  autoAnimate?: boolean;
   className?: string;
 }
 
-/**
- * Interactive Before/After visual transformation comparator with smooth continuous
- * auto-gliding motion (like an editorial GIF loop) that pauses immediately when the
- * user hovers or drags the handle.
- */
 export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
   beforeSrc,
   afterSrc,
   beforeLabel = 'Antes',
   afterLabel = 'Depois',
   altSubject,
-  autoAnimate = true,
   className = '',
 }) => {
   const [position, setPosition] = useState(52);
-  const [isInteracting, setIsInteracting] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Smooth infinite gliding animation (like a living GIF) when user isn't dragging/hovering
-  useEffect(() => {
-    if (!autoAnimate || isInteracting) return;
-    if (
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
-      return;
-    }
-
-    let rafId = 0;
-    const start = performance.now();
-
-    const tick = (now: number) => {
-      const elapsedSec = (now - start) / 1000;
-      // Gentle sinusoidal sweep between 22% and 78%
-      const nextPos = 50 + Math.sin(elapsedSec * 0.85) * 28;
-      setPosition(nextPos);
-      rafId = requestAnimationFrame(tick);
-    };
-
-    rafId = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId);
-  }, [autoAnimate, isInteracting]);
-
-  const updateFromClientX = (clientX: number) => {
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const pct = ((clientX - rect.left) / rect.width) * 100;
-    setPosition(Math.max(4, Math.min(96, pct)));
-  };
-
   return (
     <div
-      ref={containerRef}
-      onMouseEnter={() => setIsInteracting(true)}
-      onMouseLeave={() => setIsInteracting(false)}
-      onMouseMove={(e) => {
-        if (e.buttons === 1) updateFromClientX(e.clientX);
-      }}
-      onTouchStart={() => setIsInteracting(true)}
-      onTouchMove={(e) => {
-        if (e.touches[0]) updateFromClientX(e.touches[0].clientX);
-      }}
-      onTouchEnd={() => setIsInteracting(false)}
-      className={`relative select-none overflow-hidden rounded-xl bg-[#141417] border border-[var(--border-subtle)] aspect-[4/3] ${className}`}
+      className={`relative select-none overflow-hidden focus-within:outline-2 focus-within:outline-offset-4 focus-within:outline-[var(--accent)] rounded-xl bg-[#141417] border border-[var(--border-subtle)] aspect-[4/3] ${className}`}
     >
       {/* After Image (Full Base Layer) */}
       <SafeImage
@@ -126,12 +72,7 @@ export const BeforeAfterSlider: React.FC<BeforeAfterSliderProps> = ({
         step={0.5}
         value={position}
         aria-label={`Comparar antes e depois de ${altSubject}`}
-        onFocus={() => setIsInteracting(true)}
-        onBlur={() => setIsInteracting(false)}
-        onChange={(e) => {
-          setIsInteracting(true);
-          setPosition(Number(e.target.value));
-        }}
+        onChange={(event) => setPosition(Number(event.target.value))}
         className="absolute inset-0 w-full h-full opacity-0 cursor-ew-resize z-10"
       />
     </div>

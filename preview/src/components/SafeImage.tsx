@@ -22,8 +22,9 @@ export const SafeImage: React.FC<SafeImageProps> = ({
     return (
       <div
         className={`flex flex-col items-center justify-center bg-[var(--bg-surface-alt)] text-center p-6 ${className}`}
-        role="img"
-        aria-label={alt}
+        role={alt ? "img" : undefined}
+        aria-label={alt || undefined}
+        aria-hidden={!alt || undefined}
       >
         <NordenLogo variant="markOnly" className="opacity-70 mb-2" />
         <span className="text-xs text-[var(--text-muted)] max-w-[180px] truncate">
@@ -38,6 +39,7 @@ export const SafeImage: React.FC<SafeImageProps> = ({
       src={src}
       alt={alt}
       referrerPolicy="no-referrer"
+      decoding={priority ? undefined : "async"}
       onError={() => setFailedSrc(src)}
       className={className}
       loading={priority ? 'eager' : 'lazy'}
