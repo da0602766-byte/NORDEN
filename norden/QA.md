@@ -1,6 +1,50 @@
 # Verificação do NORDEN
 
-## Interface substituída pelo visual do HTML enviado — 25/11/2026
+## Verificação de produção
+
+Em 26 de novembro de 2026, o domínio da Vercel serviu a interface do ZIP na página inicial e na loja, ligada ao catálogo Supabase. As telas de cliente e de gerência abriram em rotas separadas. No navegador, um produto foi adicionado à sacola com o mesmo preço da loja e removido ao concluir o teste. Após a otimização, a navegação da tela de login para Serviços e Loja exibiu os seis produtos, sem erros de console observados.
+
+| Verificação | Resultado |
+| --- | --- |
+| Página inicial, loja, cliente e gerência | HTTP 200 no domínio de produção |
+| Inicialização para visitantes em `/api/boot` | 5,04–6,06 s antes e 0,32–0,35 s depois, medidos até o primeiro byte |
+| Inicialização leve do formulário de login | 0,31–0,46 s até o primeiro byte e 119 bytes de resposta em duas medições |
+| Catálogo da vitrine | 0,37 s até o primeiro byte na medição após a publicação, com quatro serviços e seis produtos ativos |
+| Login com e-mail fictício em produção | HTTP 401 em 0,49 s, conforme esperado |
+| Imagem da tela de login | De 968.721 bytes para 138.308 bytes, redução de aproximadamente 86% |
+| Supabase | Cinco índices da migração de desempenho presentes no esquema `norden` |
+| Testes locais | 21 testes aprovados com `npm test` e 19 testes de integração aprovados ao rodar a suíte sobre PostgreSQL local |
+| Compilação React | TypeScript e build de produção aprovados |
+
+O ganho combina a mudança da função da Vercel de São Paulo (`gru1`) para Portland (`pdx1`), na região do banco, e a redução de consultas e do trabalho inicial. A agenda busca bloqueios e reservas do dia juntos. A loja busca o catálogo e o carrinho quando necessário. O portal de entrada mostra o formulário do visitante usando uma resposta mínima. A página inicial e a loja passaram a carregar módulos JavaScript por rota, e os arquivos versionados da vitrine recebem cache longo. A tabela registra amostras de rede a partir da máquina de teste.
+
+O login válido, o agendamento, as permissões dos portais e a conclusão de pedido foram exercitados na suíte local com dados fictícios. Em produção, o e-mail de conta estava desativado e o catálogo ainda não tinha profissionais ativos. O teste público não criou contas, reservas ou pedidos.
+
+### Repetir a verificação
+
+Confira a [página inicial](https://norden-steel.vercel.app/), a [loja](https://norden-steel.vercel.app/loja), a [área do cliente](https://norden-steel.vercel.app/usuario) e a [gerência](https://norden-steel.vercel.app/gerencia). Use `curl.exe` no PowerShell, ou `curl` nos demais terminais, para comparar os tempos a partir da mesma rede.
+
+```sh
+curl -sS -D - -w "\nHTTP %{http_code} | TTFB %{time_starttransfer}s | total %{time_total}s\n" 'https://norden-steel.vercel.app/api/boot?view=entry'
+curl -sS -w "\nHTTP %{http_code} | TTFB %{time_starttransfer}s | total %{time_total}s\n" 'https://norden-steel.vercel.app/api/boot?view=storefront'
+```
+
+A primeira rota deve retornar `production: true` e `entryOnly: true` quando consultada sem sessão. A segunda deve mostrar o catálogo público. O cabeçalho `X-Vercel-Id` indica `pdx1` como região da função em produção. Em caso de lentidão, compare o retorno inicial do HTML com o da API. Se a API falhar, consulte os logs da função na Vercel e o estado do PostgreSQL e das migrações no Supabase. Para conferir o catálogo, compare preços e disponibilidade com a gerência.
+
+Na raiz do repositório, rode os comandos abaixo para verificar a aplicação e a interface. O PowerShell também pode executar a suíte sobre PostgreSQL local com `$env:NORDEN_TEST_POSTGRES='1'; node --test norden/tests/integration.test.mjs`, com as dependências já instaladas.
+
+```sh
+npm --prefix norden ci
+npm --prefix preview ci
+npm --prefix norden test
+npm --prefix norden run build
+npm --prefix preview run typecheck
+npm --prefix preview run build:live
+```
+
+## Histórico de verificação local
+
+### Interface substituída pelo visual do HTML enviado — 25/11/2026
 
 O arquivo enviado foi preservado em `referencia/interface-original.html`. Seu visual Grafite Premium, emblema, composição editorial e organização Flow/Journey/Care/Store foram adaptados à aplicação com API e SQLite. A demonstração de perfis e a base em localStorage do HTML não substituem a autenticação nem a persistência do projeto.
 
@@ -12,7 +56,7 @@ O arquivo enviado foi preservado em `referencia/interface-original.html`. Seu vi
 - Inspeção visual no Edge: landing e fotografias dos produtos na loja em janela ampla; área Care vazia em janela estreita. A ficha preenchida do Journey foi validada por renderização autenticada automatizada, sem completar um atendimento real no navegador. O navegador integrado estava indisponível. Não houve auditoria integral de acessibilidade ou teste em dispositivo físico.
 
 
-## Revisão local após importação para VS Code — 25/11/2026
+### Revisão local após importação para VS Code — 25/11/2026
 
 - Projeto extraído em `Documents/NORDEN/norden`, com workspace `../NORDEN.code-workspace` e tarefas de preparação, execução, testes, build e depuração por F5.
 - Corrigida a leitura do carrinho de visitante: valores inválidos no armazenamento local, como `null`, listas e quantidades inválidas, podiam interromper a renderização. Um teste adicional cobre a navegação pública e a tela de carrinho nessas condições, inclusive quando o armazenamento está bloqueado.
@@ -22,7 +66,7 @@ O arquivo enviado foi preservado em `referencia/interface-original.html`. Seu vi
 - Os arquivos JSON de configuração do VS Code foram validados. O comando de abertura do workspace terminou sem erro fora do ambiente restrito. A ferramenta de inspeção da interface estava indisponível, portanto a janela do editor e as telas no navegador não foram confirmadas visualmente nesta revisão.
 - A revisão incluiu leitura das rotas, autenticação, autorização, agenda, atendimento, catálogo, estoque, checkout e interface. A aprovação dos testes não substitui homologação operacional. Permanecem os limites já documentados: pagamento simulado ou presencial, envio de e-mail local e distância de entrega informada pelo usuário.
 
-## Verificação que acompanhava o pacote original
+### Verificação que acompanhava o pacote original
 
 25 de novembro de 2026. Instâncias locais com dados fictícios e banco SQLite isolado por teste. O navegador foi usado para verificar a experiência pública. A API autenticada foi verificada com clientes HTTP de teste. A suíte executou 16 testes e todos passaram. As telas privadas foram renderizadas com respostas autenticadas para os três papéis.
 
@@ -40,7 +84,7 @@ O arquivo enviado foi preservado em `referencia/interface-original.html`. Seu vi
 | QA-29 · Falhas e sessão | Invalidação de sessões após redefinição verificada pela API. Falhas de rede física não foram reproduzidas. A interface tem tratamento de reconexão e de sessão expirada. |
 | QA-30 · Acessibilidade e vazio | Layout móvel, árvore de acessibilidade, foco e navegação pública inspecionados. Sem auditoria WCAG integral ou verificação em dispositivo físico. |
 
-## Execução e decisões
+### Execução e decisões
 
 1. Fundação: criação e aplicação de migration, teste de abertura do SQLite e verificação do fuso.
 2. Identidade e catálogo: acesso por papel, cadastro de cliente, convite administrativo e visibilidade do catálogo.

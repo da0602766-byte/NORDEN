@@ -1,14 +1,27 @@
 # NORDEN — Salão Inteligente Masculino
 
-Plataforma local com agendamento, área profissional, histórico Journey, manuais Care e loja. Interface em português, Node.js e SQLite, sem dependências externas de execução.
+Plataforma em português para agendamento, atendimento, histórico Journey, manuais Care, realocação Flow e loja com gestão de catálogo, preços, estoque e pedidos.
 
-## GitHub Pages
+Criado por **Douglas Anderson, Davi Alexandre, Waldemar Roberto e Cristian Pereira**.
 
-[Abrir a demonstração online](https://da0602766-byte.github.io/NORDEN/). A interface React em `preview/` inclui landing page, loja, agenda, Journey, Care, Flow e painéis com perfis fictícios. Reservas e pedidos são simulações guardadas apenas no navegador. O servidor em `norden/` usa seu próprio banco SQLite e mantém os fluxos que exigem autenticação.
+## Produção
 
-[Demonstração do cliente, Lucas Martins](https://da0602766-byte.github.io/NORDEN/?perfil=cliente#/app) · [Demonstração da gerência, Rafael Almeida](https://da0602766-byte.github.io/NORDEN/?perfil=gestor#/gestao).
+| Acesso | Endereço |
+| --- | --- |
+| Página inicial | [norden-steel.vercel.app](https://norden-steel.vercel.app/) |
+| Loja | [NORDEN Store](https://norden-steel.vercel.app/loja) |
+| Cliente | [Área do cliente](https://norden-steel.vercel.app/usuario) · [Criar conta](https://norden-steel.vercel.app/usuario/cadastro) |
+| Equipe | [Gerência](https://norden-steel.vercel.app/gerencia) |
 
-Em **Settings → Pages**, mantenha **Deploy from a branch → main → /docs**. Para atualizar a demonstração pública:
+A Vercel hospeda o site e a API. O Supabase mantém o PostgreSQL. A conta de cliente é criada pelo cadastro público. O acesso profissional ou de gestão depende de convite. Na gerência, **Produtos** cadastra e edita produtos. Em **Estoque → Alterar preço**, a equipe define o valor normal e o promocional. Desative um produto para retirá-lo da loja e preservar o histórico.
+
+O checkout registra pedidos com pagamento presencial, retirada no salão ou entrega com taxa estimada pela distância informada. As rotinas de publicação, configuração, acesso e diagnóstico estão no [guia técnico e operacional](norden/README.md). Consulte também as [medições em produção e os testes](norden/QA.md).
+
+## Demonstração no GitHub Pages
+
+A [demonstração pública](https://da0602766-byte.github.io/NORDEN/) usa perfis e dados fictícios. As reservas e os pedidos simulados ficam no navegador. [Lucas Martins, cliente](https://da0602766-byte.github.io/NORDEN/?perfil=cliente#/app) e [Rafael Almeida, gestor](https://da0602766-byte.github.io/NORDEN/?perfil=gestor#/gestao) apresentam as duas áreas.
+
+O GitHub Pages publica `main` a partir de `/docs`. Para atualizar a demonstração, gere a saída com os comandos abaixo e envie o código de `preview/` e os artefatos de `docs/` no mesmo commit.
 
 ```sh
 cd preview
@@ -17,19 +30,18 @@ npm run typecheck
 npm run build:pages
 ```
 
-Envie as mudanças em `preview/` e o conteúdo gerado em `docs/` no mesmo commit. Para desenvolvimento, use `npm run dev` em `preview/`. A exportação legada em `norden/` grava por padrão em `norden/dist/pages-legacy/`.
+## Estrutura do repositório
 
-## Vercel e Supabase
+| Caminho | Conteúdo |
+| --- | --- |
+| [`preview/`](preview/) | Interface React/Vite da demonstração e da página inicial e loja de produção |
+| [`norden/`](norden/) | API Node.js, portais, checkout, configuração da Vercel e testes |
+| [`supabase/migrations/`](supabase/migrations/) | Esquema PostgreSQL de produção e migrações de índices |
+| [`docs/`](docs/) | Build estático da demonstração no GitHub Pages |
 
-O aplicativo autenticado fica em `norden/`. Na Vercel, selecione essa pasta como **Root Directory**, com Node.js 24. As rotas `/usuario` e `/gerencia` abrem os portais, e `/usuario/cadastro` cria uma conta de cliente. A equipe entra por convite. Na gerência, abra **Estoque → Alterar preço** para editar o valor em reais e atualizar a loja.
+## Desenvolvimento local
 
-O [esquema PostgreSQL](supabase/migrations/20261126231645_norden_schema.sql) fica numa área privada do Supabase. A função na Vercel usa `DATABASE_URL` com a conexão TLS do pooler e um login membro de `norden_app`, sem privilégios de administração. Configure `NORDEN_SAFETY_KEY` como segredo estável de pelo menos 32 caracteres. `NORDEN_SITE_URL` é a origem HTTPS da aplicação. Quando houver SMTP, configure também `NORDEN_SMTP_URL` e `NORDEN_MAIL_FROM` para recuperação de senha e verificação de e-mail. O checkout inicia com pagamento presencial e permite retirada ou entrega estimada.
-
-Após aplicar a migração, gere o primeiro convite no ambiente de administração com `node src/first-manager.mjs email-do-gestor`, em `norden/`, com as variáveis do banco e da origem configuradas. O link expira e é de uso único. Os perfis e a carga fictícia ficam restritos à demonstração e aos testes. Cadastre serviços, profissionais, expediente e produtos reais pela gerência antes de atender clientes.
-
-## Executar localmente
-
-Requer Node.js 24 ou superior.
+Use Node.js 24 ou superior. A aplicação local usa SQLite e uma carga fictícia.
 
 ```sh
 cd norden
@@ -38,16 +50,4 @@ npm run seed
 npm start
 ```
 
-Abra http://127.0.0.1:4173. A primeira carga informa no terminal a senha das contas fictícias. No Windows, também é possível abrir `norden/Iniciar_NORDEN_Windows.cmd`.
-
-No VS Code, abra `NORDEN.code-workspace` e pressione F5.
-
-## Verificar
-
-```sh
-cd norden
-npm test
-npm run build
-```
-
-Leia as [instruções completas](norden/README.md) e os [resultados de verificação](norden/QA.md). Esta versão usa dados fictícios, pagamento simulado ou presencial e caixa de saída de e-mail local.
+Abra [a instância local](http://127.0.0.1:4173). A senha da primeira carga aparece no terminal. No VS Code, abra `NORDEN.code-workspace` e pressione **F5**. Para trabalhar na interface React da demonstração, execute `npm ci` e `npm run dev` em `preview/`.
